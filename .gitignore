@@ -1,0 +1,16 @@
+bin/
+obj/
+publish/
+publish-test/
+TestResults/
+.vs/
+.idea/
+*.user
+*.suo
+
+# Local screenshots / dev artifacts
+s*.png
+smoke.png
+shot*.png
+!assets/**/*.png
+!refs/*.png

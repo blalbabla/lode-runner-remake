@@ -1,0 +1,61 @@
+{
+  "runtimeTarget": {
+    "name": ".NETCoreApp,Version=v10.0/win-x64",
+    "signature": ""
+  },
+  "compilationOptions": {},
+  "targets": {
+    ".NETCoreApp,Version=v10.0": {},
+    ".NETCoreApp,Version=v10.0/win-x64": {
+      "LodeRunner/1.0.0": {
+        "dependencies": {
+          "LodeRunner.Core": "1.0.0",
+          "Raylib-cs": "8.1.0"
+        },
+        "runtime": {
+          "LodeRunner.dll": {}
+        }
+      },
+      "Raylib-cs/8.1.0": {
+        "runtime": {
+          "lib/net10.0/Raylib-cs.dll": {
+            "assemblyVersion": "8.1.0.0",
+            "fileVersion": "8.1.0.0"
+          }
+        },
+        "native": {
+          "runtimes/win-x64/native/raylib.dll": {
+            "fileVersion": "6.0.0.0"
+          }
+        }
+      },
+      "LodeRunner.Core/1.0.0": {
+        "runtime": {
+          "LodeRunner.Core.dll": {
+            "assemblyVersion": "1.0.0.0",
+            "fileVersion": "1.0.0.0"
+          }
+        }
+      }
+    }
+  },
+  "libraries": {
+    "LodeRunner/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    },
+    "Raylib-cs/8.1.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-5BH1IoueW/47PjykoD5rHSQGkfG/0ROdv1Lj/LiJ+m/KBmDAmDRyXRpgS/qOZL6ScIMtnY5nG31dQ58y/VVXUg==",
+      "path": "raylib-cs/8.1.0",
+      "hashPath": "raylib-cs.8.1.0.nupkg.sha512"
+    },
+    "LodeRunner.Core/1.0.0": {
+      "type": "project",
+      "serviceable": false,
+      "sha512": ""
+    }
+  }
+}
