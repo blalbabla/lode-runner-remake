@@ -360,7 +360,9 @@ internal sealed class AudioManager : IDisposable
             var source = new Cell(
                 Math.Clamp((e.X + world.Grid.TileUnits / 2) / world.Grid.TileUnits, 0, world.Grid.Cols - 1),
                 Math.Clamp((e.Y + world.Grid.TileUnits / 2) / world.Grid.TileUnits, 0, world.Grid.Rows - 1));
-            var mix = SpatialAudio.Evaluate(world.Grid, _listenerCell, source, _listenerYaw, _firstPersonListener);
+            var mix = _firstPersonListener
+                ? SpatialAudio.Evaluate(world.Grid, _listenerCell, source, _listenerYaw, true)
+                : new SpatialMix(0.18f, 0.5f, 0f);
             if (mix.Gain < 0.05f) continue;
 
             _guardStepFlip = !_guardStepFlip;
@@ -434,6 +436,11 @@ internal sealed class AudioManager : IDisposable
 
     private void PlayAt(Sfx id, Cell source, Grid grid)
     {
+        if (!_firstPersonListener)
+        {
+            Play(id);
+            return;
+        }
         var mix = SpatialAudio.Evaluate(grid, _listenerCell, source, _listenerYaw, _firstPersonListener);
         Play(id, mix.Gain, mix.Pan, mix.Occlusion);
     }
