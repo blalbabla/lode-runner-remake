@@ -38,8 +38,8 @@ foreach (var file in levelFiles)
     }
 }
 
-var config = new GameConfig();
 var settings = GameSettings.Load();
+var config = settings.ToGameConfig();
 double tickDuration = TickDurationFor(settings.Speed);
 
 Raylib.SetTraceLogLevel(TraceLogLevel.None);
@@ -63,6 +63,7 @@ LoadingScreen.Show(0.02f, "Creating game objects...");
 using var audio = new AudioManager(LoadingScreen.Show);
 audio.Volume = settings.Volume / 100f;
 audio.MusicVolume = settings.MusicVolume / 100f;
+audio.SetMixerLevels(settings.MusicBass / 100f, settings.MusicPad / 100f, settings.MusicWind / 100f, settings.MusicBells / 100f);
 LoadingScreen.Show(0.95f, "Compiling shaders...");
 var lighting = new LightingShader();
 var renderer = new WorldRenderer(lighting);
@@ -162,6 +163,12 @@ while (!quit && !Raylib.WindowShouldClose())
             case MenuCommand.GameSpeedChanged:
                 tickDuration = TickDurationFor(settings.Speed);
                 accumulator = 0;
+                break;
+            case MenuCommand.GameplayChanged:
+                config = settings.ToGameConfig();
+                break;
+            case MenuCommand.MusicMixerChanged:
+                audio.SetMixerLevels(settings.MusicBass / 100f, settings.MusicPad / 100f, settings.MusicWind / 100f, settings.MusicBells / 100f);
                 break;
             case MenuCommand.NewGame:
             case MenuCommand.Continue:

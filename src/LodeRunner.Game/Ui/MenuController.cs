@@ -16,6 +16,8 @@ internal enum MenuPage
     Settings,
     Video,
     Controls,
+    Gameplay,
+    MusicMixer,
 }
 
 internal enum MenuCommand
@@ -33,6 +35,8 @@ internal enum MenuCommand
     EnemyAiChanged,
     GameSpeedChanged,
     GraphicsChanged,
+    GameplayChanged,
+    MusicMixerChanged,
 }
 
 /// <summary>
@@ -51,7 +55,7 @@ internal sealed class MenuController
         ? ["Continue", "New game", "Level select", "High scores", "Settings", "Exit"]
         : ["New game", "Level select", "High scores", "Settings", "Exit"];
     private static readonly string[] PauseItems = ["Resume", "Restart level", "Settings", "Main menu", "Exit"];
-    private string[] SettingsItems => ["Video", "Controls", $"Sound: {_settings.Volume}%", $"Music: {_settings.MusicVolume}%", $"Enemy AI: {_settings.EnemyAi}", $"Game speed: {GameSpeedInfo.Label(_settings.Speed)}", $"Graphics: {_settings.Graphics}", "Back"];
+    private string[] SettingsItems => ["Video", "Controls", $"Sound: {_settings.Volume}%", $"Music: {_settings.MusicVolume}%", $"Enemy AI: {_settings.EnemyAi}", $"Game speed: {GameSpeedInfo.Label(_settings.Speed)}", $"Graphics: {_settings.Graphics}", "Gameplay", "Music mixer", "Back"];
     private static readonly VideoMode[] VideoModes = [VideoMode.Fullscreen, VideoMode.Borderless, VideoMode.Windowed];
 
     private readonly GameSettings _settings;
@@ -165,6 +169,8 @@ internal sealed class MenuController
             MenuPage.Settings => UpdateSettings(confirm, back, left, right),
             MenuPage.Video => UpdateVideo(confirm, back),
             MenuPage.Controls => UpdateControls(confirm, back, left, right),
+            MenuPage.Gameplay => UpdateGameplay(confirm, back, left, right),
+            MenuPage.MusicMixer => UpdateMusicMixer(confirm, back, left, right),
             _ => MenuCommand.None,
         };
     }
@@ -266,7 +272,6 @@ internal sealed class MenuController
             return MenuCommand.GraphicsChanged;
         }
 
-
         if (!confirm) return MenuCommand.None;
         switch (_sel)
         {
@@ -274,6 +279,8 @@ internal sealed class MenuController
             case 1: Open(MenuPage.Controls); break;
             case 2:
             case 3: break;
+            case 7: Open(MenuPage.Gameplay); break;
+            case 8: Open(MenuPage.MusicMixer); break;
             default: Open(_settingsParent); break;
         }
         return MenuCommand.None;
@@ -374,6 +381,79 @@ internal sealed class MenuController
         Open(MenuPage.Settings);
     }
 
+    // ---- Gameplay tuning page ----
+    // Row 0: Enemy speed  25..100 % step 5
+    // Row 1: Hole open    100..700 ticks step 10
+    // Row 2: Refill time  8..60 ticks step 2
+    // Row 3: Back
+
+    private static readonly string[] GameplayLabels = ["Enemy speed", "Hole open time", "Refill time", "Back"];
+
+    private string GameplayValue(int row) => row switch
+    {
+        0 => $"{_settings.EnemySpeedPct}%",
+        1 => $"{_settings.HoleOpenTicks} ticks",
+        2 => $"{_settings.RefillTicks} ticks",
+        _ => "",
+    };
+
+    private MenuCommand UpdateGameplay(bool confirm, bool back, bool left, bool right)
+    {
+        if (back || (confirm && _sel == 3)) { Open(MenuPage.Settings); return MenuCommand.None; }
+        if (!left && !right) return MenuCommand.None;
+
+        switch (_sel)
+        {
+            case 0:
+                _settings.EnemySpeedPct = Math.Clamp(_settings.EnemySpeedPct + (right ? 5 : -5), 25, 100);
+                break;
+            case 1:
+                _settings.HoleOpenTicks = Math.Clamp(_settings.HoleOpenTicks + (right ? 10 : -10), 100, 700);
+                break;
+            case 2:
+                _settings.RefillTicks = Math.Clamp(_settings.RefillTicks + (right ? 2 : -2), 8, 60);
+                break;
+        }
+        _settings.Save();
+        return MenuCommand.GameplayChanged;
+    }
+
+    // ---- Music mixer page ----
+    // Row 0: Bass   0..100 step 10
+    // Row 1: Pad    0..100 step 10
+    // Row 2: Wind   0..100 step 10
+    // Row 3: Bells  0..100 step 10
+    // Row 4: Back
+
+    private static readonly string[] MixerLabels = ["Bass", "Pad", "Wind", "Bells", "Back"];
+
+    private string MixerValue(int row) => row switch
+    {
+        0 => $"{_settings.MusicBass}%",
+        1 => $"{_settings.MusicPad}%",
+        2 => $"{_settings.MusicWind}%",
+        3 => $"{_settings.MusicBells}%",
+        _ => "",
+    };
+
+    private MenuCommand UpdateMusicMixer(bool confirm, bool back, bool left, bool right)
+    {
+        if (back || (confirm && _sel == 4)) { Open(MenuPage.Settings); return MenuCommand.None; }
+        if (!left && !right) return MenuCommand.None;
+
+        int delta = right ? 10 : -10;
+        switch (_sel)
+        {
+            case 0: _settings.MusicBass  = Math.Clamp(_settings.MusicBass  + delta, 0, 100); break;
+            case 1: _settings.MusicPad   = Math.Clamp(_settings.MusicPad   + delta, 0, 100); break;
+            case 2: _settings.MusicWind  = Math.Clamp(_settings.MusicWind  + delta, 0, 100); break;
+            case 3: _settings.MusicBells = Math.Clamp(_settings.MusicBells + delta, 0, 100); break;
+        }
+        _settings.Save();
+        return MenuCommand.MusicMixerChanged;
+    }
+
+
     private int ItemCount() => Page switch
     {
         MenuPage.Main => MainItems.Length,
@@ -381,6 +461,8 @@ internal sealed class MenuController
         MenuPage.Settings => SettingsItems.Length,
         MenuPage.Video => VideoModes.Length + 1,
         MenuPage.Controls => ControlRows + 2,
+        MenuPage.Gameplay => 4,    // 3 sliders + Back
+        MenuPage.MusicMixer => 5,  // 4 sliders + Back
         _ => 1,
     };
 
@@ -417,6 +499,8 @@ internal sealed class MenuController
             MenuPage.Pause => "PAUSED",
             MenuPage.Settings => "SETTINGS",
             MenuPage.Video => "VIDEO",
+            MenuPage.Gameplay => "GAMEPLAY",
+            MenuPage.MusicMixer => "MUSIC MIXER",
             _ => "CONTROLS",
         };
         DrawCentered(title, (int)(sh * 0.14f), (int)(64 * s), Color.Gold, sw);
@@ -430,6 +514,8 @@ internal sealed class MenuController
             case MenuPage.Settings: DrawList(SettingsItems, sw, sh, s); break;
             case MenuPage.Video: DrawVideo(sw, sh, s); break;
             case MenuPage.Controls: DrawControls(sw, sh, s); break;
+            case MenuPage.Gameplay: DrawSliderPage(GameplayLabels, GameplayValue, sw, sh, s); break;
+            case MenuPage.MusicMixer: DrawSliderPage(MixerLabels, MixerValue, sw, sh, s); break;
         }
 
         string hint = Page == MenuPage.HighScores
@@ -442,6 +528,8 @@ internal sealed class MenuController
                 : "Up/Down: row     Left/Right: column     Enter: rebind     Del: clear     Esc: back"
             : Page == MenuPage.Settings
                 ? "Up/Down: select     Enter: confirm     Left/Right: change value     Esc: back"
+                : Page is MenuPage.Gameplay or MenuPage.MusicMixer
+                ? "Up/Down: select     Left/Right: change value     Esc: back"
                 : "Up/Down: select     Enter: confirm     Esc: back";
         DrawCentered(hint, sh - (int)(40 * s), (int)(18 * s), Color.Gray, sw);
 
@@ -552,12 +640,43 @@ internal sealed class MenuController
         DrawItem("Back", _sel == VideoModes.Length, y + VideoModes.Length * (int)(52 * s), size, sw);
     }
 
+    /// <summary>
+    /// Generic two-column slider page: left column = label, right column = value.
+    /// The last item is always "Back" with no value.
+    /// </summary>
+    private void DrawSliderPage(string[] labels, Func<int, string> value, int sw, int sh, float s)
+    {
+        int size  = (int)(32 * s);
+        int step  = (int)(54 * s);
+        int count = labels.Length;
+        int y0    = sh / 2 - step * (count - 1) / 2;
+        int labelX = sw / 2 - (int)(280 * s);
+        int valueX = sw / 2 + (int)(100 * s);
+        for (int i = 0; i < count; i++)
+        {
+            int y = y0 + i * step;
+            bool sel = i == _sel;
+            Color col = sel ? Color.Gold : Color.RayWhite;
+            UiFont.Draw(labels[i], labelX, y, size, col);
+            string v = value(i);
+            if (v.Length > 0)
+            {
+                if (sel)
+                {
+                    UiFont.Draw("<", valueX - (int)(28 * s), y, size, Color.Gold);
+                    UiFont.Draw(">", valueX + UiFont.Measure(v, size) + (int)(8 * s), y, size, Color.Gold);
+                }
+                UiFont.Draw(v, valueX, y, size, col);
+            }
+        }
+    }
+
     private void DrawControls(int sw, int sh, float s)
     {
         int size = (int)(26 * s);
         int rowH = (int)(46 * s);
         int cell = (int)(180 * s);
-        int top = (int)(sh * 0.30f);
+        int top  = (int)(sh * 0.30f);
         int nameX = sw / 2 - (int)(500 * s);
         int slotX = sw / 2 - (int)(310 * s);
 

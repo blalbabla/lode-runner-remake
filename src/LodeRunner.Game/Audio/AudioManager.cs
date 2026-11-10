@@ -224,6 +224,10 @@ internal sealed class AudioManager : IDisposable
         _music.Update(world, gameHeld, levelIndex);
     }
 
+    /// <summary>Live-updates the music mixer levels (0..1 each). Takes effect on the next synthesized chunk.</summary>
+    public void SetMixerLevels(float bass, float pad, float wind, float bells)
+        => _music.SetMixerLevels(bass, pad, wind, bells);
+
     /// <summary>
     /// The hero is being walled in: the death scream starts now, while the bricks close over him, instead of
     /// after the hole has shut. Plays once per world; the later PlayerDied event then skips the scream.

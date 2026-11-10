@@ -86,6 +86,12 @@ internal sealed class DarkAmbientSynth : IDisposable
 
     private float _volume = 0.5f;
 
+    // Live mixer levels (0..1); default 1 = original generator gain.
+    private float _mixBass  = 1f;
+    private float _mixPad   = 1f;
+    private float _mixWind  = 1f;
+    private float _mixBells = 1f;
+
     public DarkAmbientSynth(bool audioReady)
     {
         if (!audioReady) return;
@@ -219,7 +225,7 @@ internal sealed class DarkAmbientSynth : IDisposable
             _subPhase2 = Frac(_subPhase2 + (root * 2f + 0.16f) * dt);
             float sub = MathF.Sin(_subPhase1 * twoPi) * 0.65f
                       + MathF.Sin(_subPhase2 * twoPi) * 0.35f;
-            sub = MathF.Tanh(sub * 1.35f) * 0.04f; // sub sits under the pad; keep it felt, not heard
+            sub = MathF.Tanh(sub * 1.35f) * 0.04f * _mixBass; // sub sits under the pad; keep it felt, not heard
 
             // ---- Layer 2: Dark Unison Pad (3 notes x 3 voices = 9 oscillators) ----
             float padRawL = 0f;
@@ -270,8 +276,8 @@ internal sealed class DarkAmbientSynth : IDisposable
                 padRawR += hSig * 0.45f;
             }
 
-            padRawL *= 0.085f;
-            padRawR *= 0.085f;
+            padRawL *= 0.085f * _mixPad;
+            padRawR *= 0.085f * _mixPad;
 
             // Resonant State Variable Low-Pass Filter for the pad.
             // Cutoff breathes with LFOs, opens with tension/exitOpen, and closes when muffled in menus.
@@ -308,7 +314,7 @@ internal sealed class DarkAmbientSynth : IDisposable
             _windBpR += fWind * wHpR;
             _windLpR += fWind * _windBpR;
 
-            float windGain = 0.045f * (0.65f + 0.35f * lfo3) * (1f - 0.35f * _muffle);
+            float windGain = 0.045f * (0.65f + 0.35f * lfo3) * (1f - 0.35f * _muffle) * _mixWind;
             float windL = _windBpL * windGain;
             float windR = _windBpR * windGain;
 
@@ -332,7 +338,7 @@ internal sealed class DarkAmbientSynth : IDisposable
                 _bellPhaseM = Frac(_bellPhaseM + _bellFreq * 2.414f * dt);
                 float mod = MathF.Sin(_bellPhaseM * twoPi) * _bellEnv * 0.45f;
                 _bellPhaseC = Frac(_bellPhaseC + _bellFreq * dt);
-                float bellSig = MathF.Sin(_bellPhaseC * twoPi + mod) * _bellEnv * _bellEnv * 0.040f * (1f - 0.5f * _muffle);
+                float bellSig = MathF.Sin(_bellPhaseC * twoPi + mod) * _bellEnv * _bellEnv * 0.040f * (1f - 0.5f * _muffle) * _mixBells;
                 bellL = bellSig * (1f - _bellPan);
                 bellR = bellSig * _bellPan;
             }
@@ -380,6 +386,15 @@ internal sealed class DarkAmbientSynth : IDisposable
     }
 
     private static float Frac(float x) => x - MathF.Floor(x);
+
+    /// <summary>Live-updates the mix levels for each layer (0 = silent, 1 = default).</summary>
+    public void SetMixerLevels(float bass, float pad, float wind, float bells)
+    {
+        _mixBass  = Math.Clamp(bass,  0f, 1f);
+        _mixPad   = Math.Clamp(pad,   0f, 1f);
+        _mixWind  = Math.Clamp(wind,  0f, 1f);
+        _mixBells = Math.Clamp(bells, 0f, 1f);
+    }
 
     public void Dispose()
     {
