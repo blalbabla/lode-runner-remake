@@ -219,7 +219,7 @@ internal sealed class DarkAmbientSynth : IDisposable
             _subPhase2 = Frac(_subPhase2 + (root * 2f + 0.16f) * dt);
             float sub = MathF.Sin(_subPhase1 * twoPi) * 0.65f
                       + MathF.Sin(_subPhase2 * twoPi) * 0.35f;
-            sub = MathF.Tanh(sub * 1.35f) * 0.22f;
+            sub = MathF.Tanh(sub * 1.35f) * 0.08f; // was 0.22 — reduced so the pad and bells are not buried
 
             // ---- Layer 2: Dark Unison Pad (3 notes x 3 voices = 9 oscillators) ----
             float padRawL = 0f;
@@ -270,8 +270,8 @@ internal sealed class DarkAmbientSynth : IDisposable
                 padRawR += hSig * 0.45f;
             }
 
-            padRawL *= 0.065f;
-            padRawR *= 0.065f;
+            padRawL *= 0.085f;
+            padRawR *= 0.085f;
 
             // Resonant State Variable Low-Pass Filter for the pad.
             // Cutoff breathes with LFOs, opens with tension/exitOpen, and closes when muffled in menus.
