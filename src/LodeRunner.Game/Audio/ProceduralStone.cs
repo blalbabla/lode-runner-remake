@@ -22,7 +22,7 @@ internal static class ProceduralStone
     // One slab impact: start time, fundamental, loudness, decay rate (1/s), grit cutoff (Hz).
     private readonly record struct Hit(float Start, float Hz, float Gain, float Decay, float GritHz, float GritGain);
 
-    public static byte[] Create(UiKind kind, int variant = 0)
+    public static StereoClip Create(UiKind kind, int variant = 0)
     {
         // duration, comb feedback, comb damping, wet level, delay scale, hits
         (float duration, float feedback, float damp, float wet, float delayScale, Hit[] hits) = kind switch
@@ -101,7 +101,7 @@ internal static class ProceduralStone
             right[i] = MathF.Tanh(right[i] * norm * 1.1f) * f;
         }
 
-        return ProceduralFootsteps.ToWav(left, right);
+        return new StereoClip(left, right);
     }
 
     private static void AddHit(float[] buf, Hit h, Random rng)

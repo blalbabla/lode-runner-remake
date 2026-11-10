@@ -5,7 +5,7 @@ namespace LodeRunner.Game.Audio;
 /// Voices use a glottal pulse source through three time-varying formant filters (a vowel), plus breath noise,
 /// vibrato and a little room echo. Every generator takes a <c>variant</c> number: variant N always gives the same
 /// sound, but different variants shift pitch, timing and decay slightly, so repeated events do not sound identical.
-/// All generators return WAV bytes and are thread-safe, so variants can be rendered in parallel at startup.
+/// All generators return float clips and are thread-safe, so variants can be rendered in parallel at startup.
 /// </summary>
 internal static partial class ProceduralSfx
 {
@@ -19,7 +19,7 @@ internal static partial class ProceduralSfx
 
     // ---------------------------------------------------------------- gold: small bell "ding"
 
-    public static byte[] CreateGold(int variant = 0)
+    public static StereoClip CreateGold(int variant = 0)
     {
         var vr = Rng(1, variant);
         const float duration = 0.75f;
@@ -67,7 +67,7 @@ internal static partial class ProceduralSfx
     // ---------------------------------------------------------------- voices
 
     /// <summary>Quiet, long, frightened "aaaah" while falling; rises in pitch and starts to tremble.</summary>
-    public static byte[] CreateFall(int variant = 0)
+    public static StereoClip CreateFall(int variant = 0)
     {
         var vr = Rng(2, variant);
         float duration = 1.7f * J(vr, 0.08f);
@@ -104,7 +104,7 @@ internal static partial class ProceduralSfx
     }
 
     /// <summary>Short startled, choked "oh!": quick pitch jump, tight throat, falls away fast.</summary>
-    public static byte[] CreateTrap(int variant = 0)
+    public static StereoClip CreateTrap(int variant = 0)
     {
         var vr = Rng(3, variant);
         const float duration = 0.5f;
@@ -143,7 +143,7 @@ internal static partial class ProceduralSfx
     /// Scream of pain and horror: male voice that tears upward into a strained, cracking "AAAH", then
     /// breaks and collapses into a ragged gasp. Pressed phonation, heavy air noise, hard saturation.
     /// </summary>
-    public static byte[] CreateDeath(int variant = 0)
+    public static StereoClip CreateDeath(int variant = 0)
     {
         var vr = Rng(4, variant);
         float duration = 1.25f * J(vr, 0.06f);
@@ -185,7 +185,7 @@ internal static partial class ProceduralSfx
     }
 
     /// <summary>Slow, sad funeral toll: a few low bells struck far apart, each ringing for seconds in a big hall.</summary>
-    public static byte[] CreateGameOver(int variant = 0)
+    public static StereoClip CreateGameOver(int variant = 0)
     {
         var vr = Rng(5, variant);
         const float duration = 8.0f;
@@ -242,7 +242,7 @@ internal static partial class ProceduralSfx
         return Finish(dry, wet: 0.55f, feedback: 0.66f, damp: 0.62f, level: 0.8f, delayScale: 2.1f, lowCut: 0.004f);
     }
 
-    private static byte[] Voice(
+    private static StereoClip Voice(
         float duration,
         int seed,
         Func<float, float> pitch,
@@ -344,8 +344,8 @@ internal static partial class ProceduralSfx
 
     // ---------------------------------------------------------------- shared
 
-    /// <summary>Adds a small stereo room echo, normalises to <paramref name="level"/> and returns WAV bytes.</summary>
-    private static byte[] Finish(float[] dry, float wet, float feedback, float damp, float level, float delayScale, float lowCut)
+    /// <summary>Adds a small stereo room echo and returns normalized float samples.</summary>
+    private static StereoClip Finish(float[] dry, float wet, float feedback, float damp, float level, float delayScale, float lowCut)
     {
         int frames = dry.Length;
         ReadOnlySpan<int> baseL = [1559, 2203, 3019, 4093];
@@ -378,7 +378,7 @@ internal static partial class ProceduralSfx
             right[i] *= norm * f;
         }
 
-        return ProceduralFootsteps.ToWav(left, right);
+        return new StereoClip(left, right);
     }
 
     /// <summary>RBJ band-pass biquad (constant 0 dB peak gain).</summary>

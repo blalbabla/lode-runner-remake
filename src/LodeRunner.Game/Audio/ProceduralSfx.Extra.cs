@@ -5,7 +5,7 @@ internal static partial class ProceduralSfx
     // ---------------------------------------------------------------- ladders: metallic taps
 
     /// <summary>Three quick, ringing raps on a steel rung, climbing in pitch.</summary>
-    public static byte[] CreateLadders(int variant = 0)
+    public static StereoClip CreateLadders(int variant = 0)
     {
         var vr = Rng(6, variant);
         const float duration = 0.6f;
@@ -58,7 +58,7 @@ internal static partial class ProceduralSfx
     /// a shrieking wail of damned souls spiralling down, a rising hiss of breath, and at the end the heavy slam of
     /// a gate closing on the underworld, all in a huge, dark hall.
     /// </summary>
-    public static byte[] CreateEnemyDie(int variant = 0)
+    public static StereoClip CreateEnemyDie(int variant = 0)
     {
         var vr = Rng(8, variant);
         float duration = 2.3f * J(vr, 0.05f);
@@ -181,7 +181,7 @@ internal static partial class ProceduralSfx
     // ---------------------------------------------------------------- win: joyful choir
 
     /// <summary>Short major-key choral fanfare: sung "ah" in harmony, ending on a held C major chord.</summary>
-    public static byte[] CreateWin(int variant = 0)
+    public static StereoClip CreateWin(int variant = 0)
     {
         var vr = Rng(9, variant);
         const float duration = 5.2f;

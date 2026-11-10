@@ -27,6 +27,15 @@
   <!-- Compile only the pure-logic Game files (no Raylib window APIs). -->
   <ItemGroup>
     <Compile Include="..\..\src\LodeRunner.Game\Input\FpsController.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\SpatialAudio.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\Sfx.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\ProceduralMixer.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\DarkAmbientSynth.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\AudioDiag.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\ProceduralSfx.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\ProceduralSfx.Extra.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\ProceduralStone.cs" />
+    <Compile Include="..\..\src\LodeRunner.Game\Audio\ProceduralFootsteps.cs" />
   </ItemGroup>
 
 </Project>

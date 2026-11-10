@@ -252,6 +252,10 @@ while (!quit && !Raylib.WindowShouldClose())
             playerGridRow: playerGridRow,
             grid: world.Grid);
     }
+    float listenerYaw = fpsRunning
+        ? fpsOut.CameraYaw
+        : world.Player.Facing == Facing.Right ? 0f : MathF.PI;
+    audio.UpdateListener(world, listenerYaw, fpsRunning);
     if (running)
     {
         accumulator += Math.Min(frameTime, tickDuration * MaxStepsPerFrame) * death.SimScale; // slow motion while the hero is bricked in
@@ -383,7 +387,7 @@ while (!quit && !Raylib.WindowShouldClose())
     // Slow, smooth camera sway while the game is held: pause menu, "press any key", death, level complete.
     bool gameHeld = menu.Active || awaitingStart || campaign.IsComplete || campaign.IsGameOver
         || world.Phase is GamePhase.Lost or GamePhase.Won;
-    audio.UpdateMusic(world, gameHeld, campaign.LevelIndex);
+    audio.UpdateMusic(world, gameHeld, campaign.LevelIndex, frameTime);
     idleSway = Math.Clamp(idleSway + (gameHeld ? frameTime : -frameTime) / 1.2f, 0f, 1f);
     if (idleSway > 0f && !fpsActive)
     {

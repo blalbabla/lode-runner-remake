@@ -21,6 +21,8 @@ internal static class AudioDiag
     private static int _gc0, _gc1, _gc2;
     private static int _frames, _underruns, _lateFrames, _gcFrames;
     private static double _maxGap, _maxSynth;
+    private static float _maxPeak, _maxLimiterReduction;
+    private static int _maxVoices;
     private static bool _held;
 
     public static bool Enabled { get; set; }
@@ -49,7 +51,7 @@ internal static class AudioDiag
     private static double _pendingGap;
 
     /// <summary>Call after the feed loop with the number of chunks rendered and the time spent synthesising.</summary>
-    public static void EndUpdate(int chunks, double synthMs)
+    public static void EndUpdate(int chunks, double synthMs, float peak = 0f, float limiterReduction = 0f, int voices = 0)
     {
         if (!Enabled || _start == 0 || _pendingGap == 0) return;
 
@@ -59,6 +61,9 @@ internal static class AudioDiag
         Gaps.Add(gap);
         if (gap > _maxGap) _maxGap = gap;
         if (synthMs > _maxSynth) _maxSynth = synthMs;
+        if (peak > _maxPeak) _maxPeak = peak;
+        if (limiterReduction > _maxLimiterReduction) _maxLimiterReduction = limiterReduction;
+        if (voices > _maxVoices) _maxVoices = voices;
 
         int g0 = GC.CollectionCount(0) - _gc0, g1 = GC.CollectionCount(1) - _gc1, g2 = GC.CollectionCount(2) - _gc2;
         _gc0 += g0; _gc1 += g1; _gc2 += g2;
@@ -105,7 +110,7 @@ internal static class AudioDiag
         return $"""
 
             # SUMMARY frames={_frames} meanGap={mean:F1}ms p99Gap={p99:F1}ms maxGap={_maxGap:F1}ms maxSynth={_maxSynth:F2}ms
-            #   underruns={_underruns} lateFrames(>75% of sub-buffer)={_lateFrames} framesWithGC={_gcFrames} totalGC={_gc0}/{_gc1}/{_gc2}
+            #   peak={_maxPeak:F3} limiterReduction={_maxLimiterReduction:F3} maxVoices={_maxVoices} underruns={_underruns} lateFrames(>75% of sub-buffer)={_lateFrames} framesWithGC={_gcFrames} totalGC={_gc0}/{_gc1}/{_gc2}
 
             """;
     }

@@ -6,7 +6,7 @@ namespace LodeRunner.Game.Audio;
 /// <summary>
 /// Generates soft, natural procedural footstep, ladder-rung and rope-grip sounds
 /// with a warm low-frequency thump, muted sole scuff, and subtle stone cavern early-reflection reverb.
-/// Built in-memory as stereo 16-bit PCM WAVs and loaded via <see cref="Raylib.LoadWaveFromMemory"/>.
+/// Built in memory as stereo float clips; WAV encoding exists only for an audio-device fallback.
 /// </summary>
 internal static class ProceduralFootsteps
 {
@@ -24,14 +24,16 @@ internal static class ProceduralFootsteps
         GuardRight,
     }
 
-    public static Sound Create(StepKind kind)
+    public static Sound Create(StepKind kind) => ToSound(CreateClip(kind));
+
+    public static StereoClip CreateClip(StepKind kind, int variant = 0)
     {
         bool metal = kind is StepKind.ClimbLeft or StepKind.ClimbRight;
-        float duration = metal ? 0.30f : 0.24f; // soft tap + quiet cavern echo tail (longer for the ringing rung)
+        var rng = new Random(1000 + (int)kind * 73 + variant * 941);
+        float duration = (metal ? 0.30f : 0.24f) * (0.94f + (float)rng.NextDouble() * 0.12f);
         int frames = (int)(SampleRate * duration);
         var dryL = new float[frames];
         var dryR = new float[frames];
-        var rng = new Random(1000 + (int)kind * 73);
 
         // Configure acoustic character per surface & foot (left/right alternation).
         // Frequencies in 120..360 Hz range cut through the sub-bass drone clearly on any speakers.
@@ -47,6 +49,12 @@ internal static class ProceduralFootsteps
             StepKind.GuardLeft  => (195f, 74f, 0.62f, 0.22f, 780f, 52f),
             _                   => (212f, 80f, 0.60f, 0.22f, 830f, 54f),
         };
+        float pitch = 0.94f + (float)rng.NextDouble() * 0.12f;
+        startHz *= pitch;
+        endHz *= pitch;
+        thumpGain *= 0.90f + (float)rng.NextDouble() * 0.20f;
+        scuffGain *= 0.85f + (float)rng.NextDouble() * 0.30f;
+        decayRate *= 0.90f + (float)rng.NextDouble() * 0.20f;
 
         float phase = 0f;
         float lpNoise = 0f;
@@ -143,12 +151,14 @@ internal static class ProceduralFootsteps
             mixR[idx] *= fade;
         }
 
-        return ToSound(mixL, mixR);
+        return new StereoClip(mixL, mixR);
     }
 
     internal static byte[] ToWav(float[] left, float[] right) => EncodeStereoWav16(left, right);
 
     internal static Sound ToSound(float[] left, float[] right) => LoadWav(ToWav(left, right));
+
+    internal static Sound ToSound(StereoClip clip) => ToSound(clip.Left, clip.Right);
 
     /// <summary>Loads WAV bytes as a Raylib sound. Must run on the main thread (the DSP that produced them need not).</summary>
     internal static Sound LoadWav(byte[] wav)
@@ -163,7 +173,7 @@ internal static class ProceduralFootsteps
     /// Muffled, quiet "dull thud" for the dig: rounded sub thump, low filtered rumble,
     /// soft crumbling-brick grit and a dark cavern tail. Deliberately free of harsh highs.
     /// </summary>
-    public static byte[] CreateDig(int variant = 0)
+    public static StereoClip CreateDig(int variant = 0)
     {
         const float duration = 0.55f;
         int frames = (int)(SampleRate * duration);
@@ -246,7 +256,7 @@ internal static class ProceduralFootsteps
             mixR[idx] *= fade;
         }
 
-        return ToWav(mixL, mixR);
+        return new StereoClip(mixL, mixR);
     }
 
     internal static void AllPassInPlace(float[] data, int delay, float gain)

@@ -17,10 +17,7 @@ internal sealed class DarkAmbientSynth : IDisposable
 {
     private const int SampleRate = 44100;
     private const int Channels = 2;
-    // One sub-buffer (the stream has two). The main thread refills a sub-buffer once per rendered frame, so the
-    // sub-buffer length is the longest frame hitch that can pass without an audible dropout: 4096 frames ~ 93 ms.
-    // Latency does not matter for ambient music (sound effects use their own sounds).
-    internal const int BufferFrames = 4096;
+    internal const int BufferFrames = 2048;
 
     // Dark cavern root frequencies in Hz — one octave up from C1 range so the pad and bells are audible
     // on full-range speakers as well as on laptop drivers. (D2, C2, Eb2, Bb1, F2, C#2)
@@ -34,11 +31,12 @@ internal sealed class DarkAmbientSynth : IDisposable
         69.296f, // C#2
     ];
 
-    private readonly AudioStream _stream;
-    private readonly bool _valid;
-    private bool _started;
-    private readonly float[] _buffer = new float[BufferFrames * Channels];
     private readonly Random _rng = new(1337);
+    private readonly AudioStream _stream;
+    private readonly bool _standalone;
+    private readonly bool _valid;
+    private readonly float[] _standaloneBuffer = new float[BufferFrames * Channels];
+    private bool _started;
 
     // Stereo ping-pong delay lines (~470 ms L, ~630 ms R) + all-pass diffusion buffers.
     private readonly float[] _delayL = new float[20727];
@@ -85,6 +83,8 @@ internal sealed class DarkAmbientSynth : IDisposable
     private float _masterEnv; // 3-second fade-in on startup so filters settle without any initial thump
 
     private float _volume = 0.5f;
+    private float _duck = 1f;
+    private float _targetDuck = 1f;
 
     // Live mixer levels (0..1); default 1 = original generator gain.
     private float _mixBass  = 1f;
@@ -100,15 +100,15 @@ internal sealed class DarkAmbientSynth : IDisposable
     private float _seqPhaseBass;
     private float _seqPhaseBells;
 
-    public DarkAmbientSynth(bool audioReady)
+    public DarkAmbientSynth(bool standalone)
     {
-        if (!audioReady) return;
-
-        Raylib.SetAudioStreamBufferSizeDefault(BufferFrames);
-        _stream = Raylib.LoadAudioStream(SampleRate, 32, Channels);
-        _valid = Raylib.IsAudioStreamValid(_stream);
-        if (!_valid) return;
-
+        _standalone = standalone;
+        if (standalone)
+        {
+            Raylib.SetAudioStreamBufferSizeDefault(BufferFrames);
+            _stream = Raylib.LoadAudioStream(SampleRate, 32, Channels);
+            _valid = Raylib.IsAudioStreamValid(_stream);
+        }
         for (int i = 0; i < _padPhases.Length; i++)
             _padPhases[i] = (float)_rng.NextDouble();
 
@@ -116,11 +116,10 @@ internal sealed class DarkAmbientSynth : IDisposable
         _seqPhasePad   = (float)_rng.NextDouble();
         _seqPhaseWind  = (float)_rng.NextDouble();
         _seqPhaseBass  = (float)_rng.NextDouble();
-        _seqPhaseBells = (float)_rng.NextDouble();
+            _seqPhaseBells = (float)_rng.NextDouble();
 
-        Raylib.SetAudioStreamVolume(_stream, _volume);
-        // Playback starts from Update() only after the first buffers are filled; a stream that plays while nobody
-        // feeds it (e.g. during loading) loops its last buffer and is heard as a buzz/click.
+        if (_valid) Raylib.SetAudioStreamVolume(_stream, _volume);
+
     }
 
     /// <summary>Music volume in [0, 1] (scaled alongside Raylib's master volume).</summary>
@@ -136,15 +135,6 @@ internal sealed class DarkAmbientSynth : IDisposable
 
     public void Update(GameWorld world, bool gameHeld, int levelIndex)
     {
-        if (!_valid) return;
-
-        if (_volume <= 0.001f)
-        {
-            if (Raylib.IsAudioStreamPlaying(_stream))
-                Raylib.PauseAudioStream(_stream);
-            return;
-        }
-
         // Shift root note when entering a new level.
         if (levelIndex != _lastLevel)
         {
@@ -173,31 +163,22 @@ internal sealed class DarkAmbientSynth : IDisposable
         // Tension rises when an active guard is within 7 tiles of the player.
         _targetTension = Math.Clamp(1f - (nearestDist - 1.5f) / 6.0f, 0f, 1f);
 
-        AudioDiag.BeginUpdate(gameHeld);
-        int chunks = 0;
-        double synthMs = 0;
+        if (!_valid) return;
         while (Raylib.IsAudioStreamProcessed(_stream))
         {
-            long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
-            SynthesizeChunk(_buffer);
-            synthMs += System.Diagnostics.Stopwatch.GetElapsedTime(t0).TotalMilliseconds;
-            Raylib.UpdateAudioStream(_stream, (ReadOnlySpan<float>)_buffer, BufferFrames);
-            chunks++;
+            RenderInto(_standaloneBuffer);
+            Raylib.UpdateAudioStream(_stream, (ReadOnlySpan<float>)_standaloneBuffer, BufferFrames);
         }
-        // Start/resume only now, after the buffers above are filled.
         if (!_started)
         {
             Raylib.PlayAudioStream(_stream);
             _started = true;
         }
-        else if (!Raylib.IsAudioStreamPlaying(_stream))
-        {
-            Raylib.ResumeAudioStream(_stream);
-        }
-        AudioDiag.EndUpdate(chunks, synthMs);
+        else if (!Raylib.IsAudioStreamPlaying(_stream)) Raylib.ResumeAudioStream(_stream);
+
     }
 
-    private void SynthesizeChunk(float[] buf)
+    internal void RenderInto(float[] buf)
     {
         const float dt = 1f / SampleRate;
         const float twoPi = MathF.PI * 2f;
@@ -207,12 +188,14 @@ internal sealed class DarkAmbientSynth : IDisposable
         // Dark chord intervals above root: Root (2x), Perfect Fifth (3x), Minor Sixth / Phrygian inflection (3.2x).
         ReadOnlySpan<float> chordMul = [2.0f, 3.0f, 3.1748f];
 
-        for (int i = 0; i < BufferFrames; i++)
+        int frames = buf.Length / Channels;
+        for (int i = 0; i < frames; i++)
         {
             // Smooth parameter envelopes per sample to prevent zipper noise.
             _tension += (_targetTension - _tension) * 0.00015f;
             _exitOpen += (_targetExitOpen - _exitOpen) * 0.00010f;
             _muffle += (_targetMuffle - _muffle) * 0.00015f;
+            _duck += (_targetDuck - _duck) * 0.00035f;
             _curRoot += (_targetRoot - _curRoot) * 0.000025f;
 
             // Autonomous slow root note drift every ~25..45 seconds.
@@ -391,12 +374,12 @@ internal sealed class DarkAmbientSynth : IDisposable
             float wetL = AllPass(_ap2L, ref _ap2LIdx, AllPass(_ap1L, ref _ap1LIdx, _delayLpL, 0.55f), 0.50f);
             float wetR = AllPass(_ap2R, ref _ap2RIdx, AllPass(_ap1R, ref _ap1RIdx, _delayLpR, 0.55f), 0.50f);
 
-            float outL = MathF.Tanh((dryL + wetL * 0.48f) * 0.85f) * _masterEnv;
-            float outR = MathF.Tanh((dryR + wetR * 0.48f) * 0.85f) * _masterEnv;
+            float outL = MathF.Tanh((dryL + wetL * 0.48f) * 0.85f) * _masterEnv * _duck;
+            float outR = MathF.Tanh((dryR + wetR * 0.48f) * 0.85f) * _masterEnv * _duck;
             if (_masterEnv < 1f) _masterEnv = Math.Min(1f, _masterEnv + dt * 0.35f);
 
-            buf[i * 2] = outL;
-            buf[i * 2 + 1] = outR;
+            buf[i * 2] = outL * _volume;
+            buf[i * 2 + 1] = outR * _volume;
         }
     }
 
@@ -422,10 +405,13 @@ internal sealed class DarkAmbientSynth : IDisposable
         _mixBells = Math.Clamp(bells, 0f, 1f);
     }
 
+    /// <summary>Sets temporary music gain for foreground sound effects.</summary>
+    public void SetDucking(float gain) => _targetDuck = Math.Clamp(gain, 0.25f, 1f);
+
     public void Dispose()
     {
-        if (!_valid) return;
         AudioDiag.Flush();
+        if (!_valid) return;
         Raylib.StopAudioStream(_stream);
         Raylib.UnloadAudioStream(_stream);
     }
