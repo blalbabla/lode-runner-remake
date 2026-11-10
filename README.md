@@ -11,10 +11,12 @@ A faithful remake of the classic Lode Runner in .NET 10 and Raylib-cs. It has al
 - Death scenes: slow motion with a camera push-in and blood spray. A hero bricked into a hole convulses while the wall closes; a guard that catches him waves its arms; a guard falling on him flattens him; falling onto a guard sinks him into the monk.
 - Keyboard and gamepad (up to 4 pads) with full rebinding.
 - Top-10 high score table and lifetime stats.
-- Enemy AI switch in Settings: Classic (original greedy guard rules, default) or Smart (shortest-path search).
+- - Enemy AI switch in Settings: Smart (shortest-path BFS, default) or Classic (original greedy guard rules).
 - Game speed in Settings: Very slow / Slow / Normal (default) / Fast / Very fast. Scales the tick rate for player and guards alike.
 - Graphics in Settings: High (default) has a shadow map from a sun at the viewer's shoulder, bump-mapped brick, brushed steel, metal ladders and glowing gold. Low keeps simple lighting for weak graphics cards.
 - Fully procedural audio: no sound files. Footsteps, metal ladder rungs, stone menu slabs, bell pickups, vocal screams, a funeral toll, a choral win fanfare and a dark ambient drone are all synthesised in memory (see `docs/AUDIO.md`). Each effect has several pre-rendered variants so repeats never sound identical.
+- Gameplay tuning in Settings: enemy speed (25-100%), hole open time, refill time.
+- Music Mixer in Settings: independent level sliders for Bass, Pad, Wind and Bells layers of the ambient drone.
 - Video modes, volume, and key bindings saved between runs.
 
 ## Controls

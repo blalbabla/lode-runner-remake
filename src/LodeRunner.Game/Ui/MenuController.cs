@@ -518,7 +518,8 @@ internal sealed class MenuController
             case MenuPage.MusicMixer: DrawSliderPage(MixerLabels, MixerValue, sw, sh, s); break;
         }
 
-        string hint = Page == MenuPage.HighScores
+        string? hint = Page == MenuPage.Main ? null
+            : Page == MenuPage.HighScores
             ? "Enter / Esc: back"
             : Page == MenuPage.LevelSelect
             ? "Arrows: move     PgUp/PgDn: page     Enter: play     Esc: back"
@@ -531,7 +532,8 @@ internal sealed class MenuController
                 : Page is MenuPage.Gameplay or MenuPage.MusicMixer
                 ? "Up/Down: select     Left/Right: change value     Esc: back"
                 : "Up/Down: select     Enter: confirm     Esc: back";
-        DrawCentered(hint, sh - (int)(40 * s), (int)(18 * s), Color.Gray, sw);
+        if (hint is not null)
+            DrawCentered(hint, sh - (int)(40 * s), (int)(18 * s), Color.Gray, sw);
 
         if (Page == MenuPage.Main)
         {

@@ -62,7 +62,10 @@ Variant counts: most sounds 10, `Death` and `EnemyDie` and menu sounds 8, `Win` 
 - **Ambient** (`DarkAmbientSynth`): five layers rendered in real time into a Raylib `AudioStream`: beating sub-bass
   drone, minor/Phrygian pad through a breathing resonant filter, cavern wind noise, rare distant FM bells, and stereo
   cross-feedback delay with all-pass diffusion. It reacts to enemy proximity (tension), exit reveal (shimmer) and menus
-  (muffle).
+  (muffle). Master gains: Bass 0.04, Pad 0.028, Wind 0.090, Bells 0.080 (balanced so each layer is audible solo).
+  A four-channel layer sequencer (sine envelopes, periods 55 / 73 / 89 / 107 s, incommensurate so the pattern never
+  repeats) sweeps each layer between 20% and 100% so layers take turns leading without going silent. User mixer sliders
+  (Settings > Music Mixer) act as per-layer upper limits on top of the sequencer.
 
 ## Levels and mixing
 
@@ -70,6 +73,7 @@ Variant counts: most sounds 10, `Death` and `EnemyDie` and menu sounds 8, `Win` 
 - `Fall`, `Death` and `EnemyDie` are deliberately muffled and quiet (generator levels about 0.20 to 0.55) so that
   frequent repeats do not fatigue the player.
 - `Volume` (settings) scales all effects; `MusicVolume` scales the ambient stream.
+- Settings > Music Mixer exposes four sliders (Bass, Pad, Wind, Bells) that set per-layer upper limits in [0, 1]; the internal layer sequencer further modulates each layer within that range.
 
 ## Adding a sound
 

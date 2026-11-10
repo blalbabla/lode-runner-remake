@@ -61,12 +61,12 @@ The player can **only**: run left/right, climb a ladder up/down, move along a ro
 **Picking up gold:** the player picks up gold when the player's centre enters the gold cell.
 
 **Digging:**
-- Conditions: the player stands on support, is not hanging on a rope, not climbing and not falling. Aligned in `y`; alignment in `x` is not required (auto-alignment, see below).
+- Conditions: the player stands on support OR is on any rung of a ladder (`Pose.Climb`) OR is hanging on a rope (`Pose.Hang`). Not falling. Aligned in `y`; alignment in `x` is not required (auto-alignment, see below).
 - The dig target cell `(c±1, r+1)` must be a brick. Cell `(c±1, r)` must be empty, with no gold and no enemy (it must not contain a brick, concrete or ladder).
 - While digging, the player is stationary (`DigTicks`). The direction is fixed at the moment of the key press.
 
 *Implementation (M3):*
-- Digging from a ladder is allowed only when there is solid support underneath (you cannot dig while in mid-air on the ladder itself).
+- Digging from a ladder (any rung, ) and while hanging on a rope () is allowed -- matches original 1983 mechanics. Row is taken from  rounding so the target cell is always well-defined mid-rung or mid-rope.
 - The target cell `(c±1, r)` must be exactly `Empty`. A rope, ladder, brick or concrete there forbids digging. A hidden ladder counts as empty until revealed.
 - Digging beyond the level edge is not possible (outside the grid counts as concrete).
 - While a dig is in progress, a new hole cannot be started. The hole appears immediately at the start of the dig (state `Opening`), not at the end. The cell becomes passable when `Opening` ends.
@@ -152,11 +152,11 @@ Intact --dig--> Opening --(DigTicks)--> Open --(HoleOpenTicks)--> Refilling --(R
 | `PlayerClimbSpeed` | 4 | |
 | `PlayerRopeSpeed` | 4 | |
 | `FallSpeed` | 4 | uniform |
-| `EnemyRunSpeed` | 3 | 3.75 cells/s |
-| `EnemyClimbSpeed` | 3 | |
-| `EnemyFallSpeed` | 4 | |
+| `EnemyRunSpeed` | 2 | 2.5 cells/s (50% of player — original game) |
+| `EnemyClimbSpeed` | 2 | |
+| `EnemyFallSpeed` | 2 | |
 | `DigTicks` | 18 | |
-| `HoleOpenTicks` | 300 | 5 s |
+| `HoleOpenTicks` | 430 | ~7.2 s (default; tunable in Settings > Gameplay) |
 | `RefillTicks` | 24 | |
 | `EnemyTrapTicks` | 90 | |
 | `EnemyClimbTicks` | 36 | |
@@ -226,9 +226,9 @@ The order is fixed so that behaviour is reproducible.
 - The render layer reads the keyboard every frame and accumulates flags (`DigLeft`, `DigRight` latch until the next tick) so a short key press is not lost between ticks.
 - Default controls: arrows, WASD and numpad digits (8/4/2/6) — movement, `Z` — dig left, `X` — dig right, `Esc` — pause menu. Utility keys: `R` restart, `C` camera, `L` light, `N`/`P` level (inactive if the key is bound to an action).
 - Rebinding: each action has 3 key slots; assigning a key removes it from other slots. Settings (video mode and keys) are stored in `%APPDATA%\LodeRunner\settings.json` (`Game/Settings`).
-- Menus (`Game/Ui/MenuController`): main (Start, Settings, Exit), pause (Resume, Restart level, Settings, Main menu, Exit), settings → video (fullscreen / borderless window / window), controls (rebinding, reset). Menu navigation uses fixed keys (arrows, numpad, WASD, Enter, Esc) so a bad rebind cannot lock the menu.
+- Menus (`Game/Ui/MenuController`): main (Start, Settings, Exit), pause (Resume, Restart level, Settings, Main menu, Exit), settings → video (fullscreen / borderless window / window), controls (rebinding, reset), gameplay tuning (Enemy speed %, Hole open ticks, Refill ticks), music mixer (Bass, Pad, Wind, Bells levels). Menu navigation uses fixed keys (arrows, numpad, WASD, Enter, Esc) so a bad rebind cannot lock the menu. Navigation hints are shown at the bottom of every sub-page; the main menu shows no hint (navigation is self-evident).
 - After a level loads, the simulation is frozen (`awaitingStart`): the level and enemies are shown at their start positions, and the game starts on any key press.
-- Enemy speed: running and ladders 3 units/tick versus 4 for the player (75%).
+- Enemy speed: all three speeds (run, climb, fall) default to 2 units/tick versus 4 for the player (50%, matching the original game). Configurable in Settings > Gameplay > Enemy speed (25-100%).
 - Leaving a ladder sideways: between rows `←/→` is not ignored. If there is support next to the ladder on the nearest row above or below (a brick/concrete under the neighbouring cell, a ladder, a rope), the player smoothly rides the ladder to that row and steps off. If there is no support but the neighbouring cell is free, the player steps off and falls from the current height, shifting into the neighbouring column. If there is a wall at the side, nothing happens.
 - Enemies walking toward each other on one row (for example, toward the same ladder) no longer block each other: the enemy with the lower id has priority.
 - The camera accounts for the window aspect ratio: the whole level fits even in narrow windows.
