@@ -92,6 +92,14 @@ internal sealed class DarkAmbientSynth : IDisposable
     private float _mixWind  = 1f;
     private float _mixBells = 1f;
 
+    // Slow autonomous layer sequencer — four incommensurate sine envelopes (never repeating pattern).
+    // Periods: ~55 s (pad), ~73 s (wind), ~89 s (bass), ~107 s (bells).
+    // Range: 0.20..1.00 so each layer is always present but takes turns in the foreground.
+    private float _seqPhasePad;
+    private float _seqPhaseWind;
+    private float _seqPhaseBass;
+    private float _seqPhaseBells;
+
     public DarkAmbientSynth(bool audioReady)
     {
         if (!audioReady) return;
@@ -103,6 +111,12 @@ internal sealed class DarkAmbientSynth : IDisposable
 
         for (int i = 0; i < _padPhases.Length; i++)
             _padPhases[i] = (float)_rng.NextDouble();
+
+        // Stagger sequencer start phases so layers don't all peak at once on first play.
+        _seqPhasePad   = (float)_rng.NextDouble();
+        _seqPhaseWind  = (float)_rng.NextDouble();
+        _seqPhaseBass  = (float)_rng.NextDouble();
+        _seqPhaseBells = (float)_rng.NextDouble();
 
         Raylib.SetAudioStreamVolume(_stream, _volume);
         // Playback starts from Update() only after the first buffers are filled; a stream that plays while nobody
@@ -218,6 +232,18 @@ internal sealed class DarkAmbientSynth : IDisposable
             float lfo2 = MathF.Sin(_lfoPhase2 * twoPi);
             float lfo3 = MathF.Sin(_lfoPhase3 * twoPi);
 
+            // Slow layer sequencer — incommensurate periods so the pattern never repeats.
+            // Periods: pad ~55 s, wind ~73 s, bass ~89 s, bells ~107 s.
+            _seqPhasePad   = Frac(_seqPhasePad   + dt / 55f);
+            _seqPhaseWind  = Frac(_seqPhaseWind  + dt / 73f);
+            _seqPhaseBass  = Frac(_seqPhaseBass  + dt / 89f);
+            _seqPhaseBells = Frac(_seqPhaseBells + dt / 107f);
+            // Each envelope: 0.20 (quiet) .. 1.00 (full). Layers take turns leading without ever going silent.
+            float seqPad   = 0.20f + 0.80f * (0.5f + 0.5f * MathF.Sin(_seqPhasePad   * twoPi));
+            float seqWind  = 0.20f + 0.80f * (0.5f + 0.5f * MathF.Sin(_seqPhaseWind  * twoPi));
+            float seqBass  = 0.20f + 0.80f * (0.5f + 0.5f * MathF.Sin(_seqPhaseBass  * twoPi));
+            float seqBells = 0.20f + 0.80f * (0.5f + 0.5f * MathF.Sin(_seqPhaseBells * twoPi));
+
             float root = _curRoot;
 
             // ---- Layer 1: Sub-bass drone (fundamental + octave with 0.16 Hz beating) ----
@@ -225,7 +251,7 @@ internal sealed class DarkAmbientSynth : IDisposable
             _subPhase2 = Frac(_subPhase2 + (root * 2f + 0.16f) * dt);
             float sub = MathF.Sin(_subPhase1 * twoPi) * 0.65f
                       + MathF.Sin(_subPhase2 * twoPi) * 0.35f;
-            sub = MathF.Tanh(sub * 1.35f) * 0.04f * _mixBass; // sub sits under the pad; keep it felt, not heard
+            sub = MathF.Tanh(sub * 1.35f) * 0.04f * _mixBass * seqBass; // sub sits under the pad; keep it felt, not heard
 
             // ---- Layer 2: Dark Unison Pad (3 notes x 3 voices = 9 oscillators) ----
             float padRawL = 0f;
@@ -276,8 +302,8 @@ internal sealed class DarkAmbientSynth : IDisposable
                 padRawR += hSig * 0.45f;
             }
 
-            padRawL *= 0.085f * _mixPad;
-            padRawR *= 0.085f * _mixPad;
+            padRawL *= 0.028f * _mixPad * seqPad;
+            padRawR *= 0.028f * _mixPad * seqPad;
 
             // Resonant State Variable Low-Pass Filter for the pad.
             // Cutoff breathes with LFOs, opens with tension/exitOpen, and closes when muffled in menus.
@@ -314,7 +340,7 @@ internal sealed class DarkAmbientSynth : IDisposable
             _windBpR += fWind * wHpR;
             _windLpR += fWind * _windBpR;
 
-            float windGain = 0.045f * (0.65f + 0.35f * lfo3) * (1f - 0.35f * _muffle) * _mixWind;
+            float windGain = 0.090f * (0.65f + 0.35f * lfo3) * (1f - 0.20f * _muffle) * _mixWind * seqWind;
             float windL = _windBpL * windGain;
             float windR = _windBpR * windGain;
 
@@ -338,7 +364,7 @@ internal sealed class DarkAmbientSynth : IDisposable
                 _bellPhaseM = Frac(_bellPhaseM + _bellFreq * 2.414f * dt);
                 float mod = MathF.Sin(_bellPhaseM * twoPi) * _bellEnv * 0.45f;
                 _bellPhaseC = Frac(_bellPhaseC + _bellFreq * dt);
-                float bellSig = MathF.Sin(_bellPhaseC * twoPi + mod) * _bellEnv * _bellEnv * 0.040f * (1f - 0.5f * _muffle) * _mixBells;
+                float bellSig = MathF.Sin(_bellPhaseC * twoPi + mod) * _bellEnv * _bellEnv * 0.080f * (1f - 0.3f * _muffle) * _mixBells * seqBells;
                 bellL = bellSig * (1f - _bellPan);
                 bellR = bellSig * _bellPan;
             }
