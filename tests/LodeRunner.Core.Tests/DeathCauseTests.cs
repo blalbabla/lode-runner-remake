@@ -58,7 +58,9 @@ public class DeathCauseTests
     public void HeroDroppingOntoAGuardIsSwallowed()
     {
         // Hero walks off a high ledge while a guard runs in underneath him.
-        var w = CreateRaw(Raw3(
+        // Use player-speed enemies so the guard is fast enough to reach the fall point.
+        var fastEnemy = Config with { EnemyRunSpeed = 4, EnemyClimbSpeed = 4, EnemyFallSpeed = 4 };
+        var w = CreateRaw(fastEnemy, Raw3(
             "&      ",
             "###    ",
             "       0",

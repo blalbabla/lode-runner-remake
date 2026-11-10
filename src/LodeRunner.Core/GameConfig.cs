@@ -13,9 +13,9 @@ public sealed record GameConfig
     public int PlayerRopeSpeed { get; init; } = 4;
     public int FallSpeed { get; init; } = 4;
 
-    public int EnemyRunSpeed { get; init; } = 3;
-    public int EnemyClimbSpeed { get; init; } = 3;
-    public int EnemyFallSpeed { get; init; } = 4;
+    public int EnemyRunSpeed { get; init; } = 2;
+    public int EnemyClimbSpeed { get; init; } = 2;
+    public int EnemyFallSpeed { get; init; } = 2;
 
     public int DigTicks { get; init; } = 9;
     public int HoleOpenTicks { get; init; } = 430;

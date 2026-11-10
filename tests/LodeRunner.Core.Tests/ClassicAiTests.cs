@@ -28,7 +28,7 @@ public class ClassicAiTests
         var e = w.Enemies[0];
         int x0 = e.X;
         w.Tick(Idle);
-        Assert.Equal(x0 - 3, e.X);
+        Assert.Equal(x0 - 2, e.X);
         Assert.Equal(Facing.Left, e.Facing);
     }
 

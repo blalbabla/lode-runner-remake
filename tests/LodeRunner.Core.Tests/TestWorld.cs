@@ -46,6 +46,14 @@ internal static class TestWorld
         return new GameWorld(LevelParser.Parse(string.Join("\n", rows)), Config, 1);
     }
 
+    /// <summary>Builds a world from exactly 16 map rows using a custom config.</summary>
+    public static GameWorld CreateRaw(GameConfig config, params string[] rows)
+    {
+        if (rows.Length != LevelParser.Rows)
+            throw new ArgumentException("Need exactly 16 rows.");
+        return new GameWorld(LevelParser.Parse(string.Join("\n", rows)), config, 1);
+    }
+
     /// <summary>Ticks with <paramref name="input"/> until an event of <paramref name="kind"/> fires; returns ticks used.</summary>
     public static int TicksUntil(GameWorld w, WorldEventKind kind, InputState input = default, int limit = 2000)
     {

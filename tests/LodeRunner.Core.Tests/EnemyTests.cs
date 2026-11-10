@@ -32,12 +32,12 @@ public class EnemyTests
         int x0 = e.X;
 
         w.Tick(Idle);
-        Assert.Equal(x0 - 3, e.X);
+        Assert.Equal(x0 - 2, e.X);
         for (int i = 0; i < 10; i++)
         {
             int before = e.X;
             w.Tick(Idle);
-            Assert.Equal(before - 3, e.X);
+            Assert.Equal(before - 2, e.X);
         }
     }
 
@@ -47,7 +47,7 @@ public class EnemyTests
         var w = Create("0         &", Floor);
         var e = w.Enemies[0];
         w.Tick(Idle);
-        Assert.Equal(3, e.X);
+        Assert.Equal(2, e.X);
         Assert.Equal(Facing.Right, e.Facing);
     }
 
@@ -106,9 +106,9 @@ public class EnemyTests
         var e = w.Enemies[0];
         w.Tick(Idle);
         Assert.True(e.Falling);
-        Assert.Equal(4, e.Y - e.PrevY);
+        Assert.Equal(2, e.Y - e.PrevY);
         w.Tick(Idle);
-        Assert.Equal(4, e.Y - e.PrevY);
+        Assert.Equal(2, e.Y - e.PrevY);
     }
 
     [Fact]
@@ -141,7 +141,7 @@ public class EnemyTests
         var w = Create("&    0", Floor);
         int ticks = TicksUntil(w, WorldEventKind.PlayerDied);
         Assert.Equal(GamePhase.Lost, w.Phase);
-        Assert.InRange(ticks, 20, 80);
+        Assert.InRange(ticks, 20, 150);
     }
 
     [Fact]

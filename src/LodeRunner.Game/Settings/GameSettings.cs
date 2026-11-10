@@ -252,7 +252,7 @@ public sealed class GameSettings
     public const int DefaultMusicVolume = 60;
 
     // Gameplay tuning defaults (match GameConfig defaults)
-    public const int DefaultEnemySpeedPct = 75;  // 75% of player speed = EnemyRunSpeed 3 / PlayerRunSpeed 4
+    public const int DefaultEnemySpeedPct = 50;  // 50% of player speed = EnemyRunSpeed 2 / PlayerRunSpeed 4 (original game)
     public const int DefaultHoleOpenTicks = 430;
     public const int DefaultRefillTicks   = 24;
 
@@ -315,6 +315,7 @@ public sealed class GameSettings
         {
             EnemyRunSpeed   = enemyRun,
             EnemyClimbSpeed = enemyRun,
+            EnemyFallSpeed  = enemyRun,
             HoleOpenTicks   = HoleOpenTicks,
             RefillTicks     = RefillTicks,
         };
