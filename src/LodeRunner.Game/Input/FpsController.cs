@@ -93,6 +93,7 @@ public sealed class FpsController
     /// <param name="sDown">S key held.</param>
     /// <param name="aPressed">A key pressed this frame (edge, not held).</param>
     /// <param name="dPressed">D key pressed this frame (edge, not held).</param>
+    /// <param name="spacePressed">Space pressed this frame — drops from rope.</param>
     /// <param name="lmbPressed">Left mouse button pressed this frame.</param>
     /// <param name="playerFacing">Current sim Facing (from Player.Facing).</param>
     /// <param name="playerFalling">True while the player is in free fall.</param>
@@ -108,6 +109,7 @@ public sealed class FpsController
         bool     sDown,
         bool     aPressed,
         bool     dPressed,
+        bool     spacePressed,
         bool     lmbPressed,
         Facing   playerFacing,
         bool     playerFalling,
@@ -156,8 +158,12 @@ public sealed class FpsController
             if (aPressed) StartTurnLeft(onLadder, belowIsLadder, ladderAdjRight, ladderAdjLeft);
             if (dPressed) StartTurnRight(onLadder, belowIsLadder, ladderAdjRight, ladderAdjLeft);
 
-            // S while standing over a ladder top: turn to face the ladder
-            if (sDown && !onLadder && belowIsLadder && _body != FpsHeading.Ladder)
+            // S while standing directly above a ladder top (not on a rope, not already on ladder):
+            // turn to face it and step down. Only when S is NOT used as step-back below.
+            bool onRope  = playerPose == Pose.Hang;
+            bool onGround = playerPose is Pose.Stand or Pose.Run;
+            bool canStepBack = (onGround || onRope) && _body != FpsHeading.Ladder;
+            if (sDown && !canStepBack && !onLadder && belowIsLadder && _body != FpsHeading.Ladder)
                 StartTurnToLadder();
         }
 
@@ -171,30 +177,49 @@ public sealed class FpsController
         float camYaw   = bodyYaw + _mouseYaw;
         float camPitch = _mousePitch;
 
-        // ── 7. Translate WASD + LMB into InputState ──────────────────────────
+        // ── 7. Translate WASD + Space + LMB into InputState ─────────────────
         InputState movement = default;
         bool digLeft  = false;
         bool digRight = false;
 
         if (!_turning && !playerFalling)
         {
+            bool onRope   = playerPose == Pose.Hang;
+            bool onGround = playerPose is Pose.Stand or Pose.Run;
+
             if (_body == FpsHeading.Ladder)
             {
-                // Facing the ladder: W = climb up, S = climb down
+                // Facing the ladder: W = climb up, S = climb down.
+                // Space on a ladder has no special meaning (can't drop).
                 movement = new InputState(Up: wDown, Down: sDown);
             }
             else
             {
-                // Facing ±X
-                bool moveRight = _body == FpsHeading.Right && wDown;
-                bool moveLeft  = _body == FpsHeading.Left  && wDown;
-                movement = new InputState(Right: moveRight, Left: moveLeft);
+                // Forward direction along body heading.
+                bool fwdRight = _body == FpsHeading.Right;
 
-                // LMB dig
-                if (lmbPressed)
+                // W = move forward.
+                bool moveRight = fwdRight  && wDown;
+                bool moveLeft  = !fwdRight && wDown;
+
+                // S = step backward (no turn) on solid ground or rope.
+                // On a rope S also acts as step-back (staying on the rope, moving the other way).
+                if (sDown && (onGround || onRope))
                 {
-                    if (_body == FpsHeading.Right) digRight = true;
-                    else                           digLeft  = true;
+                    moveRight |= !fwdRight; // backward = opposite of forward
+                    moveLeft  |= fwdRight;
+                }
+
+                // Space on rope = drop (send Down so Locomotion releases the rope into free fall).
+                bool dropDown = spacePressed && onRope;
+
+                movement = new InputState(Right: moveRight, Left: moveLeft, Down: dropDown);
+
+                // LMB dig (only when not on a rope — can't dig while hanging).
+                if (lmbPressed && !onRope)
+                {
+                    if (fwdRight) digRight = true;
+                    else          digLeft  = true;
                 }
             }
         }

@@ -242,6 +242,7 @@ while (!quit && !Raylib.WindowShouldClose())
             sDown: Raylib.IsKeyDown(KeyboardKey.S),
             aPressed: Raylib.IsKeyPressed(KeyboardKey.A),
             dPressed: Raylib.IsKeyPressed(KeyboardKey.D),
+            spacePressed: Raylib.IsKeyPressed(KeyboardKey.Space),
             lmbPressed: Raylib.IsMouseButtonPressed(MouseButton.Left),
             playerFacing: world.Player.Facing,
             playerFalling: world.Player.Falling,

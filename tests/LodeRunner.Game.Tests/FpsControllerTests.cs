@@ -38,10 +38,11 @@ public class FpsControllerTests
         Pose pose = Pose.Stand,
         bool w = false, bool s = false,
         bool a = false, bool d = false,
+        bool space = false,
         bool lmb = false,
         float dt = 0.016f,
         float mx = 0f, float my = 0f) =>
-        ctrl.Update(dt, mx, my, w, s, a, d, lmb, facing, falling, pose, col, row, grid);
+        ctrl.Update(dt, mx, my, w, s, a, d, space, lmb, facing, falling, pose, col, row, grid);
 
     // ── Heading constants ─────────────────────────────────────────────────
 
@@ -291,5 +292,62 @@ public class FpsControllerTests
         Assert.True(ctrl.IsTurning);
         ctrl.Reset(Facing.Right);
         Assert.False(ctrl.IsTurning);
+    }
+
+    // ── Space on rope = drop ──────────────────────────────────────────────
+
+    [Fact]
+    public void Space_OnRope_ProducesDown()
+    {
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Right);
+        var grid = MakeGrid("############################", "                            ");
+        var out1 = Tick(ctrl, grid, col: 1, row: 14, pose: Pose.Hang, space: true);
+        Assert.True(out1.Movement.Down);
+    }
+
+    [Fact]
+    public void Space_OnGround_DoesNothing()
+    {
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Right);
+        var grid = MakeGrid("############################", "                            ");
+        var out1 = Tick(ctrl, grid, col: 1, row: 14, pose: Pose.Stand, space: true);
+        Assert.False(out1.Movement.Down);
+    }
+
+    // ── S = step backward ─────────────────────────────────────────────────
+
+    [Fact]
+    public void S_FacingRight_OnGround_ProducesLeft()
+    {
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Right);
+        var grid = MakeGrid("############################", "                            ");
+        var out1 = Tick(ctrl, grid, col: 1, row: 14, pose: Pose.Stand, s: true);
+        Assert.True(out1.Movement.Left);
+        Assert.False(out1.Movement.Right);
+    }
+
+    [Fact]
+    public void S_FacingLeft_OnGround_ProducesRight()
+    {
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Left);
+        var grid = MakeGrid("############################", "                            ");
+        var out1 = Tick(ctrl, grid, col: 2, row: 14, facing: Facing.Left, pose: Pose.Stand, s: true);
+        Assert.True(out1.Movement.Right);
+        Assert.False(out1.Movement.Left);
+    }
+
+    [Fact]
+    public void S_OnRope_StepsBackward()
+    {
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Right);
+        var grid = MakeGrid("############################", "                            ");
+        var out1 = Tick(ctrl, grid, col: 1, row: 14, pose: Pose.Hang, s: true);
+        Assert.True(out1.Movement.Left); // backward from Right heading = Left
+        Assert.False(out1.Movement.Down); // no drop without Space
     }
 }
