@@ -13,7 +13,7 @@ public sealed class WorldRenderer
     private static readonly Color GoldShine = new(255, 244, 168, 255);
     private static readonly Color Ghost = new(120, 200, 255, 90);
 
-    private const float LadderDepth = 0.3f;
+    private const float LadderDepth = 0.3f; // Z offset toward the back wall (negative Z = away from camera)
 
     private readonly LightingShader _light;
     private readonly CharacterRig _rig = new();
@@ -238,6 +238,10 @@ public sealed class WorldRenderer
 
     private static void DrawLadder(Vector3 center, bool solid, float time, int col, int row)
     {
+        // Push the ladder toward the back wall so it hugs the far side of the corridor
+        // instead of standing in the middle. Negative Z = away from camera.
+        center = center with { Z = center.Z - LadderDepth };
+
         const float railX = 0.32f;
         const float railR = 0.055f;
         Color rail = solid ? Color.White : Ghost;

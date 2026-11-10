@@ -2,6 +2,7 @@ using LodeRunner.Core;
 using LodeRunner.Core.Levels;
 using LodeRunner.Core.Simulation;
 using LodeRunner.Game.Audio;
+using LodeRunner.Game.Input;
 using LodeRunner.Game.Rendering;
 using LodeRunner.Game.Settings;
 using LodeRunner.Game.Ui;
@@ -117,6 +118,9 @@ float gameClock = 0f; // animation clock; runs slower during death slow motion
 const float ShakeDuration = 0.45f;
 float idleSway = 0f; // 0..1 blend of the slow camera sway shown while the game is paused or between rounds
 float swayClock = 0f;
+bool fpsMode = false;         // FPS mode active (toggled by F key)
+var fpsController = new FpsController();
+bool cursorHidden = false;    // tracks Raylib cursor capture state
 
 // Startup page: main menu, unless a dev flag asks to go straight into a level.
 int menuIdx = Array.IndexOf(args, "--menu");
@@ -220,14 +224,42 @@ while (!quit && !Raylib.WindowShouldClose())
 
     // Fixed-step simulation; leftover time becomes the interpolation factor.
     bool running = !menu.Active && !awaitingStart && !campaign.IsComplete && !campaign.IsGameOver;
+    // FPS controller: update once per rendered frame before the sim ticks so movement is ready.
+    // fpsActive here is the same condition used later for the camera block (intro not yet evaluated,
+    // but fpsMode is enough — intro forces fpsActive=false in the camera block anyway).
+    bool fpsRunning = fpsMode && running;
+    FpsOutput fpsOut = default;
+    if (fpsRunning)
+    {
+        var md = Raylib.GetMouseDelta();
+        int playerGridCol = (world.Player.X + world.Grid.TileUnits / 2) / world.Grid.TileUnits;
+        int playerGridRow = (world.Player.Y + world.Grid.TileUnits / 2) / world.Grid.TileUnits;
+        fpsOut = fpsController.Update(
+            dt: frameTime,
+            mouseDeltaX: md.X,
+            mouseDeltaY: md.Y,
+            wDown: Raylib.IsKeyDown(KeyboardKey.W),
+            sDown: Raylib.IsKeyDown(KeyboardKey.S),
+            aPressed: Raylib.IsKeyPressed(KeyboardKey.A),
+            dPressed: Raylib.IsKeyPressed(KeyboardKey.D),
+            lmbPressed: Raylib.IsMouseButtonPressed(MouseButton.Left),
+            playerFacing: world.Player.Facing,
+            playerFalling: world.Player.Falling,
+            playerPose: world.Player.Pose,
+            playerGridCol: playerGridCol,
+            playerGridRow: playerGridRow,
+            grid: world.Grid);
+    }
     if (running)
     {
         accumulator += Math.Min(frameTime, tickDuration * MaxStepsPerFrame) * death.SimScale; // slow motion while the hero is bricked in
-        var held = ReadMovement(keys);
+        var held = fpsRunning ? fpsOut.Movement : ReadMovement(keys);
         int steps = 0;
         while (accumulator >= tickDuration && steps < MaxStepsPerFrame)
         {
-            world.Tick(held with { DigLeft = digLeftLatch, DigRight = digRightLatch });
+            bool dl = fpsRunning ? fpsOut.DigLeft  : digLeftLatch;
+            bool dr = fpsRunning ? fpsOut.DigRight : digRightLatch;
+            world.Tick(held with { DigLeft = dl, DigRight = dr });
             campaign.Apply(world.Events);
             audio.OnTick(world, campaign.IsGameOver);
             foreach (var ev in world.Events)
@@ -312,6 +344,18 @@ while (!quit && !Raylib.WindowShouldClose())
         cam = IntroCamera.Evaluate(cam, heroPos, world.Player.Facing == Facing.Right ? 1f : -1f, introProgress);
         renderer.HidePlayer = System.Numerics.Vector3.Distance(cam.Position, IntroCamera.HeadCenter(heroPos)) < IntroCamera.HideHeroRadius;
     }
+    // FPS camera overrides the classic camera (but not the intro or closeup dev camera).
+    bool fpsActive = fpsMode && !introActive && !closeup
+                     && !campaign.IsGameOver && !campaign.IsComplete
+                     && world.Phase == GamePhase.Playing;
+    if (fpsActive)
+    {
+        // fpsOut was already updated in the fpsRunning block above (before the sim tick).
+        // If the game just became non-running (e.g. level won overlay), fpsOut is still
+        // from last frame which is fine — camera stays put.
+        cam = FpsCamera.Evaluate(heroPos, fpsOut.CameraYaw, fpsOut.CameraPitch);
+        renderer.HidePlayer = true;
+    }
     if (closeup)
     {
         // Dev aid: camera right next to the hero (and a slight 3/4 angle) for inspecting the character model.
@@ -322,8 +366,8 @@ while (!quit && !Raylib.WindowShouldClose())
         cam.FovY = 30f;
         cam.Projection = CameraProjection.Perspective;
     }
-    if (!introActive) cam = death.ApplyCamera(cam, heroPos); // slow push-in on the hero while he dies
-    if (shake > 0f)
+    if (!introActive && !fpsActive) cam = death.ApplyCamera(cam, heroPos); // slow push-in on the hero while he dies
+    if (!fpsActive && shake > 0f)
     {
         float k = shake / ShakeDuration;
         float amp = 0.18f * k * k;
@@ -339,7 +383,7 @@ while (!quit && !Raylib.WindowShouldClose())
         || world.Phase is GamePhase.Lost or GamePhase.Won;
     audio.UpdateMusic(world, gameHeld, campaign.LevelIndex);
     idleSway = Math.Clamp(idleSway + (gameHeld ? frameTime : -frameTime) / 1.2f, 0f, 1f);
-    if (idleSway > 0f)
+    if (idleSway > 0f && !fpsActive)
     {
         swayClock += frameTime;
         float w = idleSway * idleSway * (3f - 2f * idleSway);
@@ -354,6 +398,13 @@ while (!quit && !Raylib.WindowShouldClose())
     }
 
     bool useShadows = lighting.IsAvailable && shadowMap.IsValid && settings.Graphics == GraphicsQuality.High;
+    // FPS cursor: capture mouse when FPS is active and playing; release for menus/death/end screens.
+    bool wantCursorHidden = fpsMode && !menu.Active && !awaitingStart
+                            && !campaign.IsGameOver && !campaign.IsComplete
+                            && world.Phase == GamePhase.Playing;
+    if (wantCursorHidden && !cursorHidden) { Raylib.DisableCursor(); cursorHidden = true; }
+    if (!wantCursorHidden && cursorHidden) { Raylib.EnableCursor();  cursorHidden = false; }
+
     if (useShadows)
     {
         shadowMap.Begin(lighting.LightDirection, world.Grid.Cols, world.Grid.Rows);
@@ -436,6 +487,7 @@ GameWorld NewWorld(int index, bool intro = true)
     death.Reset(snapCamera: intro); // a retry lets the camera ease back out; a fresh level starts clean
     audio.Reset();
     digLeftLatch = digRightLatch = false;
+    fpsMode = false; // FPS mode resets on every new level
     return new GameWorld(levels[index], config with { EnemyAi = settings.EnemyAi }, seed: 1);
 }
 
@@ -518,6 +570,12 @@ void HandleGameInput()
         }
     }
     if (dev(KeyboardKey.C)) orthographic = !orthographic;
+    // F toggles FPS mode. Sync the controller to the current sim facing when activating.
+    if (dev(KeyboardKey.F))
+    {
+        fpsMode = !fpsMode;
+        if (fpsMode) fpsController.Reset(world.Player.Facing);
+    }
 
     bool confirm = Raylib.IsKeyPressed(KeyboardKey.Enter) || Raylib.IsKeyPressed(KeyboardKey.KpEnter) ||
                    Raylib.IsKeyPressed(KeyboardKey.Space) || PadInput.ConfirmPressed;
@@ -589,7 +647,7 @@ void HandleGameInput()
 }
 
 static bool IsDevKeyRaw(KeyboardKey k) =>
-    k is KeyboardKey.C or KeyboardKey.N or KeyboardKey.P or KeyboardKey.R
+    k is KeyboardKey.C or KeyboardKey.F or KeyboardKey.N or KeyboardKey.P or KeyboardKey.R
         or KeyboardKey.PageUp or KeyboardKey.PageDown;
 
 void DrawFade(int sw, int sh)
@@ -622,6 +680,23 @@ void DrawHud(int sw, int sh, float ui)
 {
     int size = Math.Max(10, (int)(20 * ui)), small = Math.Max(9, (int)(16 * ui)), pad = (int)(10 * ui);
     int barH = (int)(64 * ui);
+
+    // FPS mode: draw a crosshair instead of the full HUD bar while actively playing.
+    if (fpsMode && !menu.Active && !awaitingStart && !campaign.IsGameOver && !campaign.IsComplete
+        && world.Phase == GamePhase.Playing)
+    {
+        int fpsCx = sw / 2, fpsCy = sh / 2;
+        int arm = Math.Max(8, (int)(12 * ui));
+        int gap = Math.Max(3, (int)(4 * ui));
+        var col = new Color(220, 220, 220, 180);
+        Raylib.DrawRectangle(fpsCx - arm - gap, fpsCy - 1, arm, 2, col);
+        Raylib.DrawRectangle(fpsCx + gap + 1,   fpsCy - 1, arm, 2, col);
+        Raylib.DrawRectangle(fpsCx - 1, fpsCy - arm - gap, 2, arm, col);
+        Raylib.DrawRectangle(fpsCx - 1, fpsCy + gap + 1,   2, arm, col);
+        // HUD hint in top-left corner only.
+        UiFont.DrawShadow($"FPS  F:exit", pad, pad + barH / 2, small, new Color(150, 150, 160, 180));
+        return;
+    }
 
     // Panel with a gold underline.
     Raylib.DrawRectangleGradientV(0, 0, sw, barH, new Color(0, 0, 0, 215), new Color(0, 0, 0, 120));

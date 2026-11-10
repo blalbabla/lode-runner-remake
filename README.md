@@ -31,8 +31,26 @@ A faithful remake of the classic Lode Runner in .NET 10 and Raylib-cs. It has al
 | Back        | Esc                     | B                      |
 | Restart lvl | R                       |                        |
 | Next/prev   | N, PgDn / P, PgUp (unlocked levels only) | LB / RB (menus) |
+| **FPS mode** | **F** (toggle)         |                        |
 
 In-game actions can be rebound from Settings > Controls. Menu navigation on a gamepad is fixed so you can never be locked out.
+
+### FPS mode
+
+Press **F** to toggle first-person camera. The 2-D simulation is unchanged; FPS is a pure presentation layer.
+
+| FPS action            | Key / input           |
+|-----------------------|-----------------------|
+| Look around           | Mouse                 |
+| Run forward           | W                     |
+| Turn 180°             | A (left) / D (right)  |
+| Dig (in front)        | LMB                   |
+| Face/climb ladder     | A or D (when adjacent to a ladder) |
+| Climb up / down       | W / S (when facing ladder) |
+| Step onto ladder      | S (when standing above ladder top) |
+| Exit FPS mode         | F                     |
+
+Mouse look is clamped to the forward hemisphere (±90° yaw, ±75° pitch). A/D turns are non-instant (180° in 0.22 s, 90° in 0.12 s); all movement is blocked until the turn completes. FPS mode resets on each new level.
 
 ## Build and run
 
@@ -64,7 +82,10 @@ Settings and high scores are stored under `%APPDATA%\LodeRunner\` (`scores.json`
 
 - `src/LodeRunner.Core` - simulation, levels, campaign, high score table.
 - `src/LodeRunner.Game` - Raylib shell: rendering, audio, input, menus, settings.
-- `tests/LodeRunner.Core.Tests` - unit tests.
+  - `Input/FpsController.cs` — FPS mode input state machine.
+  - `Rendering/FpsCamera.cs` — FPS eye-position camera math.
+- `tests/LodeRunner.Core.Tests` - simulation unit tests (473 cases).
+- `tests/LodeRunner.Game.Tests` - game-layer unit tests (FpsController, 18 cases).
 - `docs/DESIGN.md` - design notes.
 - `docs/AUDIO.md` - procedural audio engine.
 
