@@ -98,7 +98,8 @@ public sealed class FpsController
     /// <param name="playerFacing">Current sim Facing (from Player.Facing).</param>
     /// <param name="playerFalling">True while the player is in free fall.</param>
     /// <param name="playerPose">Current sim Pose.</param>
-    /// <param name="playerGridCol">Hero's current grid column (Player.X / TileUnits).</param>
+    /// <param name="playerX">Hero's raw X position in sim units (Player.X, not grid col).</param>
+    /// <param name="playerGridCol">Hero's current grid column (Player.X / TileUnits, rounded).</param>
     /// <param name="playerGridRow">Hero's current grid row (Player.Y / TileUnits).</param>
     /// <param name="grid">Live grid for tile queries.</param>
     public FpsOutput Update(
@@ -114,6 +115,7 @@ public sealed class FpsController
         Facing   playerFacing,
         bool     playerFalling,
         Pose     playerPose,
+        int      playerX,
         int      playerGridCol,
         int      playerGridRow,
         Grid     grid)
@@ -155,8 +157,10 @@ public sealed class FpsController
         // ── 4. Process turn requests when not already turning ────────────────
         if (!_turning && !playerFalling)
         {
-            if (aPressed) StartTurnLeft(onLadder, belowIsLadder, ladderAdjRight, ladderAdjLeft);
-            if (dPressed) StartTurnRight(onLadder, belowIsLadder, ladderAdjRight, ladderAdjLeft);
+            if (aPressed) StartTurnLeft(onLadder, belowIsLadder, ladderAdjRight, ladderAdjLeft,
+                                        playerX, playerGridCol, grid.TileUnits);
+            if (dPressed) StartTurnRight(onLadder, belowIsLadder, ladderAdjRight, ladderAdjLeft,
+                                         playerX, playerGridCol, grid.TileUnits);
 
             // S while standing directly above a ladder top (not on a rope, not already on ladder):
             // turn to face it and step down. Only when S is NOT used as step-back below.
@@ -252,37 +256,27 @@ public sealed class FpsController
     // Turn logic
     // ────────────────────────────────────────────────────────────────────
 
-    private void StartTurnLeft(bool onLadder, bool belowIsLadder, bool ladderAdjRight, bool ladderAdjLeft)
+    private void StartTurnLeft(bool onLadder, bool belowIsLadder, bool ladderAdjRight, bool ladderAdjLeft,
+                                int playerX, int playerGridCol, int tileUnits)
     {
-        // On flat ground:
-        //   If facing ±X and a ladder is to the left: 90° turn toward the ladder
-        //   If facing Ladder: 90° turn to face Left (exit ladder, turn to -X)
-        //   Otherwise: 180° over left shoulder
-        // A key while facing Right and ladder is to the right of the player:
-        //   That's the ladder on the wrong side for A — handled by StartTurnRight.
-        // On / below a ladder while facing ±X: turn 90° to face it.
-
         if (_body == FpsHeading.Ladder)
         {
-            // Exit ladder heading: turn left (from -Z to -X)
             BeginTurn(HeadingToYaw(FpsHeading.Ladder), HeadingToYaw(FpsHeading.Left), Turn90Duration);
             return;
         }
 
         if (_body == FpsHeading.Right)
         {
-            // Check if a ladder is directly ahead-left (i.e. player faces Right, ladder is to the left = -X direction)
-            // In the spec: when facing Right (X-axis) and adjacent to a ladder, A turns 90° to face the ladder.
-            // "Adjacent to a ladder" here means the ladder is directly below or at the player's column (onLadder/belowIsLadder),
-            // or to the left of the player.
-            if ((onLadder || belowIsLadder || ladderAdjLeft) && HasLadderAhead(false))
+            // Ladder to the left of the player's column (adjLeft) or at current column (on/below).
+            // Only turn toward it when the player is within half a tile of the ladder centre.
+            int ladderCol = onLadder || belowIsLadder ? playerGridCol : playerGridCol - 1;
+            if ((onLadder || belowIsLadder || ladderAdjLeft)
+                && IsCloseEnoughToLadder(playerX, ladderCol, tileUnits))
             {
                 BeginTurn(HeadingToYaw(FpsHeading.Right), HeadingToYaw(FpsHeading.Ladder), Turn90Duration);
             }
             else
             {
-                // 180° over left shoulder: Right -> Ladder (90°) -> Left (another 90°)
-                // We just do the full 180° as one smooth motion.
                 BeginTurn(HeadingToYaw(FpsHeading.Right), HeadingToYaw(FpsHeading.Left), Turn180Duration);
             }
             return;
@@ -290,30 +284,33 @@ public sealed class FpsController
 
         if (_body == FpsHeading.Left)
         {
-            if ((onLadder || belowIsLadder || ladderAdjRight) && HasLadderAhead(true))
+            int ladderCol = onLadder || belowIsLadder ? playerGridCol : playerGridCol + 1;
+            if ((onLadder || belowIsLadder || ladderAdjRight)
+                && IsCloseEnoughToLadder(playerX, ladderCol, tileUnits))
             {
                 BeginTurn(HeadingToYaw(FpsHeading.Left), HeadingToYaw(FpsHeading.Ladder), Turn90Duration);
             }
             else
             {
-                // 180° over left shoulder: Left -> Right
                 BeginTurn(HeadingToYaw(FpsHeading.Left), HeadingToYaw(FpsHeading.Right), Turn180Duration);
             }
         }
     }
 
-    private void StartTurnRight(bool onLadder, bool belowIsLadder, bool ladderAdjRight, bool ladderAdjLeft)
+    private void StartTurnRight(bool onLadder, bool belowIsLadder, bool ladderAdjRight, bool ladderAdjLeft,
+                                 int playerX, int playerGridCol, int tileUnits)
     {
         if (_body == FpsHeading.Ladder)
         {
-            // Exit ladder heading: turn right (from -Z to +X)
             BeginTurn(HeadingToYaw(FpsHeading.Ladder), HeadingToYaw(FpsHeading.Right), Turn90Duration);
             return;
         }
 
         if (_body == FpsHeading.Right)
         {
-            if ((onLadder || belowIsLadder || ladderAdjRight) && HasLadderAhead(true))
+            int ladderCol = onLadder || belowIsLadder ? playerGridCol : playerGridCol + 1;
+            if ((onLadder || belowIsLadder || ladderAdjRight)
+                && IsCloseEnoughToLadder(playerX, ladderCol, tileUnits))
             {
                 BeginTurn(HeadingToYaw(FpsHeading.Right), HeadingToYaw(FpsHeading.Ladder), Turn90Duration);
             }
@@ -326,7 +323,9 @@ public sealed class FpsController
 
         if (_body == FpsHeading.Left)
         {
-            if ((onLadder || belowIsLadder || ladderAdjLeft) && HasLadderAhead(false))
+            int ladderCol = onLadder || belowIsLadder ? playerGridCol : playerGridCol - 1;
+            if ((onLadder || belowIsLadder || ladderAdjLeft)
+                && IsCloseEnoughToLadder(playerX, ladderCol, tileUnits))
             {
                 BeginTurn(HeadingToYaw(FpsHeading.Left), HeadingToYaw(FpsHeading.Ladder), Turn90Duration);
             }
@@ -353,16 +352,20 @@ public sealed class FpsController
     }
 
     // ────────────────────────────────────────────────────────────────────
+    // ────────────────────────────────────────────────────────────────────
     // Helpers
     // ────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Checks whether there is a usable ladder in the direction the player would turn toward.
-    /// <paramref name="right"/> = true means checking the +X side (right of the player).
-    /// Not currently grid-aware beyond the adjacency flags already computed; kept as a hook for
-    /// future tightening if needed.
+    /// Returns true when the player is within half a tile of the ladder column centre.
+    /// <paramref name="playerX"/> is the raw sim X (Player.X), <paramref name="ladderCol"/> is the
+    /// grid column of the ladder, <paramref name="tileUnits"/> is Grid.TileUnits.
     /// </summary>
-    private static bool HasLadderAhead(bool right) => true; // Adjacency is already filtered by the caller.
+    private static bool IsCloseEnoughToLadder(int playerX, int ladderCol, int tileUnits)
+    {
+        int ladderCenterX = ladderCol * tileUnits + tileUnits / 2;
+        return Math.Abs(playerX - ladderCenterX) <= tileUnits / 2;
+    }
 
     private static bool IsLadderAt(Grid grid, int col, int row)
     {

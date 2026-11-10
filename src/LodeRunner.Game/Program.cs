@@ -247,6 +247,7 @@ while (!quit && !Raylib.WindowShouldClose())
             playerFacing: world.Player.Facing,
             playerFalling: world.Player.Falling,
             playerPose: world.Player.Pose,
+            playerX: world.Player.X,
             playerGridCol: playerGridCol,
             playerGridRow: playerGridRow,
             grid: world.Grid);

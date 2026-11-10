@@ -41,8 +41,13 @@ public class FpsControllerTests
         bool space = false,
         bool lmb = false,
         float dt = 0.016f,
-        float mx = 0f, float my = 0f) =>
-        ctrl.Update(dt, mx, my, w, s, a, d, space, lmb, facing, falling, pose, col, row, grid);
+        float mx = 0f, float my = 0f,
+        int? rawX = null) // raw sim X; defaults to cell centre
+    {
+        int t = Cfg.TileUnits;
+        int px = rawX ?? (col * t + t / 2);
+        return ctrl.Update(dt, mx, my, w, s, a, d, space, lmb, facing, falling, pose, px, col, row, grid);
+    }
 
     // ── Heading constants ─────────────────────────────────────────────────
 
@@ -149,6 +154,51 @@ public class FpsControllerTests
         Assert.True(ctrl.IsTurning);
         for (int i = 0; i < 20; i++)
             Tick(ctrl, grid2, col: 1, row: 13, dt: 0.02f);
+        Assert.Equal(FpsHeading.Ladder, ctrl.Heading);
+    }
+
+    [Fact]
+    public void Turn90_ToLadder_NotTriggered_WhenFarFromLadder()
+    {
+        // Player at col=1 but positioned at the far edge (rawX near col boundary),
+        // ladder at col=2 (adjRight). Distance > half tile → should do 180° not 90°.
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Right);
+        // Ladder at col=2 row=14
+        var grid = MakeGrid(
+            "############################",
+            "  H                         ",
+            "                            ");
+        int t = Cfg.TileUnits;
+        // Player at col=1, rawX = 1*t + 1 (almost at left edge of col 1, far from ladder at col 2 center)
+        int farX = 1 * t + 1;
+        Tick(ctrl, grid, col: 1, row: 13, facing: Facing.Right, pose: Pose.Stand, d: true, rawX: farX);
+        // Should start a 180° turn, not a 90° ladder turn
+        Assert.True(ctrl.IsTurning);
+        for (int i = 0; i < 25; i++)
+            Tick(ctrl, grid, col: 1, row: 13, dt: 0.02f, rawX: farX);
+        // After 180° the heading should be Left, not Ladder
+        Assert.Equal(FpsHeading.Left, ctrl.Heading);
+    }
+
+    [Fact]
+    public void Turn90_ToLadder_Triggered_WhenCloseToLadder()
+    {
+        // Player at col=1, rawX near col 2 centre (within half tile of ladder at col=2).
+        // rawX = 2*t → col = (2t + t/2)/t = 2 (rounded to nearest), dist to col2 centre = t/2 → on threshold.
+        var ctrl = new FpsController();
+        ctrl.Reset(Facing.Right);
+        var grid = MakeGrid(
+            "############################",
+            "  H                         ",
+            "                            ");
+        int t = Cfg.TileUnits;
+        int closeX = 2 * t; // rawX exactly at col 2 left edge; gridCol rounds to 2
+        // col=2 so playerGridCol=2; ladder is at col=2 → onLadder/belowIsLadder triggers
+        Tick(ctrl, grid, col: 2, row: 13, facing: Facing.Right, pose: Pose.Stand, d: true, rawX: closeX);
+        Assert.True(ctrl.IsTurning);
+        for (int i = 0; i < 20; i++)
+            Tick(ctrl, grid, col: 2, row: 13, dt: 0.02f, rawX: closeX);
         Assert.Equal(FpsHeading.Ladder, ctrl.Heading);
     }
 
