@@ -219,7 +219,7 @@ internal sealed class DarkAmbientSynth : IDisposable
             _subPhase2 = Frac(_subPhase2 + (root * 2f + 0.16f) * dt);
             float sub = MathF.Sin(_subPhase1 * twoPi) * 0.65f
                       + MathF.Sin(_subPhase2 * twoPi) * 0.35f;
-            sub = MathF.Tanh(sub * 1.35f) * 0.08f; // was 0.22 — reduced so the pad and bells are not buried
+            sub = MathF.Tanh(sub * 1.35f) * 0.04f; // sub sits under the pad; keep it felt, not heard
 
             // ---- Layer 2: Dark Unison Pad (3 notes x 3 voices = 9 oscillators) ----
             float padRawL = 0f;
@@ -275,9 +275,10 @@ internal sealed class DarkAmbientSynth : IDisposable
 
             // Resonant State Variable Low-Pass Filter for the pad.
             // Cutoff breathes with LFOs, opens with tension/exitOpen, and closes when muffled in menus.
-            float cutoffHz = 155f + 85f * (0.5f + 0.5f * lfo1) + 45f * lfo2
-                           + _tension * 210f + _exitOpen * 160f;
-            cutoffHz *= 1f - 0.42f * _muffle;
+            // Base is 380 Hz so the saw/tri overtones (the "organ" richness) pass through on any speakers.
+            float cutoffHz = 380f + 160f * (0.5f + 0.5f * lfo1) + 80f * lfo2
+                           + _tension * 350f + _exitOpen * 250f;
+            cutoffHz *= 1f - 0.52f * _muffle;
             float fPad = Math.Clamp(2f * MathF.Sin(MathF.PI * cutoffHz * dt), 0.005f, 0.45f);
             const float qPad = 0.65f; // gentle dark resonance
 
