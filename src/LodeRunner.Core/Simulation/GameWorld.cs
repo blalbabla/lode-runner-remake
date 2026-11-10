@@ -180,22 +180,32 @@ public sealed class GameWorld : IEntityProbe
     }
 
     /// <summary>
-    /// Digging needs: standing on a floor (not falling, hanging or climbing), row-aligned, an intact brick
-    /// diagonally below the nearest column, and a free empty cell beside it with no gold or enemy in it.
-    /// A player standing off-centre is slid to the column centre while the dig runs.
+    /// Digging needs: not in free fall, an intact brick diagonally below-left or below-right of the player's
+    /// current cell, and an empty (non-gold, non-enemy) cell directly beside the player on the same row.
+    ///
+    /// The player can dig while standing on a floor, climbing a ladder (any rung), or hanging on a rope.
+    /// On a ladder or rope the player is not necessarily row-aligned, so the cell is derived from
+    /// <see cref="CellOf"/> (centre-of-box rounding) rather than requiring Y % TileUnits == 0.
     /// </summary>
     private bool TryStartDig(int dir)
     {
         var p = Player;
         int t = Config.TileUnits;
-        if (p.Falling || p.Y % t != 0) return false;
-        if (Locomotion.ShouldFall(Grid, p, this)) return false;
+        if (p.Falling) return false;
 
+        bool onLadderOrRope = p.Pose is Pose.Climb or Pose.Hang;
+
+        // On a floor the player must be row-aligned (original rule unchanged).
+        // On a ladder/rope the player can dig from any rung position.
+        if (!onLadderOrRope && p.Y % t != 0) return false;
+        if (!onLadderOrRope && Locomotion.ShouldFall(Grid, p, this)) return false;
+
+        // Determine the reference cell: for floor the row is p.Y/t; for ladder/rope use CellOf (rounded).
         int c = (p.X + t / 2) / t;
-        int r = p.Y / t;
-        var here = Grid.Tile(c, r);
-        if (here == TileType.Rope) return false;
-        if (here == TileType.Ladder && !Grid.IsSolid(c, r + 1)) return false;
+        int r = onLadderOrRope ? CellOf(p).Row : p.Y / t;
+
+        // Rope: original game allows digging from a rope; no special restriction.
+        // Ladder: allow at any rung including mid-ladder (original behaviour).
 
         int target = c + dir;
         if (!Grid.CanStartHole(target, r + 1)) return false;

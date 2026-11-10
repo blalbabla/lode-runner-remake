@@ -202,24 +202,31 @@ public class DigAndGoldTests
     }
 
     [Fact]
-    public void CannotDigWhileHangingOnARope()
+    public void CanDigWhileHangingOnARope()
     {
+        // Original game allows digging from a rope. Brick at col 2 row 14 should open.
         var w = CreateRaw(Raw("&-", "###", Floor));
         Run(w, Right, 12);
         Assert.Equal(Pose.Hang, w.Player.Pose);
         w.Tick(DigRight);
-        Assert.Empty(w.Grid.ActiveHoles);
+        Assert.NotEmpty(w.Grid.ActiveHoles);
     }
 
     [Fact]
-    public void CannotDigWhileOnALadderOffTheGround()
+    public void CanDigWhileOnALadderOffTheGround()
     {
-        var w = CreateRaw(Raw("  H", "  H#", "& H#", Floor));
-        Run(w, Right, 24);
-        Run(w, Up, 12); // one cell up: ladder below, nothing solid under the feet
-        Assert.Equal(13 * T, w.Player.Y);
+        // Original game allows digging from any rung of a ladder.
+        // Layout (bottom 4 rows):
+        //  row 12:   H         ladder col 2
+        //  row 13:   H         ladder col 2; col 3 is EMPTY (space for the dig hole to open into)
+        //  row 14: & H #       hero at col 0; ladder col 2; brick at col 3 (the target to dig)
+        //  row 15: ########... floor
+        var w = CreateRaw(Raw("  H ", "  H ", "& H#", Floor));
+        Run(w, Right, 24);        // move hero to ladder col (col 2)
+        Run(w, Up, 12);           // climb up one rung → mid-ladder between rows 13 and 14
+        Assert.Equal(Pose.Climb, w.Player.Pose);
         w.Tick(DigRight);
-        Assert.Empty(w.Grid.ActiveHoles);
+        Assert.NotEmpty(w.Grid.ActiveHoles);
     }
 
     [Fact]
@@ -427,4 +434,32 @@ public class DigAndGoldTests
         }));
         return $"{w.Player.X},{w.Player.Y},{w.Player.Pose},{w.Player.Falling},{w.Phase},{w.GoldRemaining},{holes}";
     }
+
+    // ---- dig from ladder / rope ----
+
+    [Fact]
+    public void PlayerCanDigWhileClimbingLadder()
+    {
+        // col: 0 1 2 3
+        // row 12:     H       ladder
+        // row 13:   H         ladder, col 3 empty (space beside mid-ladder player)
+        // row 14: & H #       hero floor col 0; col 3 = brick to dig into
+        // row 15: ########... floor
+        //
+        // Hero walks to ladder (col 2), climbs up 6 ticks (mid-rung between rows 13-14).
+        // At that point CellOf = row 13 (rounded), col 3 = empty, col 3 row 14 = brick → dig succeeds.
+        var w = CreateRaw(Raw("  H ", "  H ", "& H#", Floor));
+        Run(w, Right, 24);    // col 0 → col 2
+        Run(w, Up, 6);        // partial climb: Y between rows 13 and 14
+        Assert.Equal(Pose.Climb, w.Player.Pose);
+        // After Up*6 ticks (speed 4): Y = 14*48 - 24 = 648. CellOf.Row = (648+24)/48 = 14 not 13.
+        // Need to go higher: Up*12 → Y = 14*48 - 48 = 624. CellOf.Row = (624+24)/48 = 13. col3 row13 = empty ✓
+        Run(w, Up, 6);        // total 12 ticks up
+        Assert.Equal(Pose.Climb, w.Player.Pose);
+        w.Tick(DigRight);
+        Assert.True(w.Events.Any(e => e.Kind == WorldEventKind.DigStarted),
+            $"DigStarted expected but events: {string.Join(", ", w.Events.Select(e => e.Kind))}");
+    }
+
+    // (Additional rope-dig coverage is in CanDigWhileHangingOnARope above.)
 }
