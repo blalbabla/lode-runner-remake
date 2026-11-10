@@ -327,7 +327,7 @@ public sealed partial class CharacterRig
     private static void DrawPlayerExplode(Vector3 root, Palette palette, float explode, float time, bool shadowPass)
     {
         // Fragment definition: (localRestPos, radii, color, launchDir, spinAxis, spinRate)
-        // launchDir is in world space and is normalised; the part travels root+dir*explode*2.4 world units.
+        // launchDir is in world space and is normalised; the part travels root+dir*explode*0.9 world units.
         // spinRate is total rotation angle (radians) at explode=1.
         ReadOnlySpan<(Vector3 rest, Vector3 radii, Color color, Vector3 dir, Vector3 spin, float spinRate)> parts =
         [
@@ -366,7 +366,7 @@ public sealed partial class CharacterRig
              Vector3.Normalize(new Vector3( 0.9f, -1.6f,  0.3f)), new Vector3(-1f, 0.5f, 0f), 4.0f),
         ];
 
-        const float travel = 2.4f; // maximum travel distance in world units at explode = 1
+        const float travel = 0.9f; // maximum travel distance in world units at explode = 1
 
         for (int i = 0; i < parts.Length; i++)
         {

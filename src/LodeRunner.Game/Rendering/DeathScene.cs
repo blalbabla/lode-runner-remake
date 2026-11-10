@@ -125,8 +125,8 @@ public sealed class DeathScene
                     EmitRate(-1, Center(world.Player, grid), t < 1.4f ? 70f : 0f, dt, particles, 3.0f, 1.0f, 1.3f);
                     break;
                 case DeathCause.GuardFellOnHero:
-                    // Body parts fly outward; explode ramps from 0 to 1 over 0.35 s then holds at 1.
-                    fx = new CharacterRig.Fx(Explode: Smooth(t / 0.35f));
+                    // Body parts fly outward slowly over 2 s so they remain visible during the camera zoom-in.
+                    fx = new CharacterRig.Fx(Explode: Smooth(t / 2.0f));
                     EmitRate(-1, Center(world.Player, grid) + new Vector3(0f, -0.1f, 0f), t < 1.2f ? 55f : 0f,
                         dt, particles, 2.8f, 0.6f, 2.0f);
                     break;
