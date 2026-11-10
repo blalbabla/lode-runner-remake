@@ -1,9 +1,11 @@
 bin/
+LodeRunner/
 obj/
 publish/
 publish-test/
 TestResults/
 .vs/
+.vscode/
 .idea/
 *.user
 *.suo

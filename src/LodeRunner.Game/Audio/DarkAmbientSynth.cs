@@ -22,15 +22,16 @@ internal sealed class DarkAmbientSynth : IDisposable
     // Latency does not matter for ambient music (sound effects use their own sounds).
     internal const int BufferFrames = 4096;
 
-    // Dark cavern root frequencies in Hz (D1, C1, Eb1, Bb0, F1, C#1).
+    // Dark cavern root frequencies in Hz — one octave up from C1 range so the pad and bells are audible
+    // on full-range speakers as well as on laptop drivers. (D2, C2, Eb2, Bb1, F2, C#2)
     private static readonly float[] RootNotes =
     [
-        36.708f, // D1
-        32.703f, // C1
-        38.891f, // Eb1
-        29.135f, // Bb0
-        43.654f, // F1
-        34.648f, // C#1
+        73.416f, // D2
+        65.406f, // C2
+        77.782f, // Eb2
+        58.270f, // Bb1
+        87.308f, // F2
+        69.296f, // C#2
     ];
 
     private readonly AudioStream _stream;
