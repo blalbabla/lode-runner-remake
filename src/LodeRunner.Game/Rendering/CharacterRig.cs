@@ -55,9 +55,10 @@ public sealed partial class CharacterRig
 
     /// <summary>
     /// Death-scene modifiers set by <see cref="DeathScene"/>: Jitter = violent shaking, Flail = arms thrown up and waved
-    /// frantically, Crush = body flattened into a pancake, Offset = extra world-space shift of the body.
+    /// frantically, Crush = body flattened into a pancake, Offset = extra world-space shift of the body,
+    /// Explode = body parts fly outward (0..1; replaces all normal drawing).
     /// </summary>
-    public readonly record struct Fx(float Jitter = 0f, float Flail = 0f, float Crush = 0f, Vector3 Offset = default);
+    public readonly record struct Fx(float Jitter = 0f, float Flail = 0f, float Crush = 0f, Vector3 Offset = default, float Explode = 0f);
 
     private sealed class AnimState
     {
@@ -218,6 +219,13 @@ public sealed partial class CharacterRig
         var scaleSquash = Matrix4x4.CreateScale(sxz, sy, sxz);
         var rootXform = scaleSquash * rotLean * rotRoll * rotYaw * Matrix4x4.CreateTranslation(root);
 
+        // Explode mode: body parts fly outward; skip normal character drawing entirely.
+        if (fx.Explode > 0f && !palette.Monk)
+        {
+            DrawPlayerExplode(root, palette, fx.Explode, time, shadowPass);
+            return;
+        }
+
         if (palette.Monk)
         {
             DrawMonk(st, id, pose, dir, moving, trapped, climbingOut, time, idleBreath, s, c, cs, cc,
@@ -308,6 +316,80 @@ public sealed partial class CharacterRig
 
         // 4. Two-segment chubby arms (upper arm + forearm + round mitten hand).
         DrawArms(pose, moving, dig, climbingOut, dir, s, c, cs, cc, time, rootXform, palette, fx.Flail);
+    }
+
+    /// <summary>
+    /// Renders the hero as scattered individual body-part ellipsoids flying outward.
+    /// <paramref name="explode"/> is 0..1 (smoothstepped by DeathScene). At 1 the parts are roughly 2 cells apart.
+    /// Each part has a fixed deterministic launch direction and spin axis so the explosion looks the same every time
+    /// it is replayed and reads clearly at a glance.
+    /// </summary>
+    private static void DrawPlayerExplode(Vector3 root, Palette palette, float explode, float time, bool shadowPass)
+    {
+        // Fragment definition: (localRestPos, radii, color, launchDir, spinAxis, spinRate)
+        // launchDir is in world space and is normalised; the part travels root+dir*explode*2.4 world units.
+        // spinRate is total rotation angle (radians) at explode=1.
+        ReadOnlySpan<(Vector3 rest, Vector3 radii, Color color, Vector3 dir, Vector3 spin, float spinRate)> parts =
+        [
+            // Head — up and slightly toward viewer
+            (new Vector3( 0.00f,  0.50f,  0.01f), new Vector3(0.160f, 0.155f, 0.158f), palette.Skin,
+             Vector3.Normalize(new Vector3( 0.25f,  1.6f,  0.4f)), new Vector3(1f, 0.3f, 0f), 4.5f),
+
+            // Torso (chest+belly merged into one chunk) — straight up
+            (new Vector3( 0.00f,  0.18f,  0.01f), new Vector3(0.148f, 0.280f, 0.125f), palette.Shirt,
+             Vector3.Normalize(new Vector3(-0.15f,  1.0f,  0.2f)), new Vector3(0f, 0f, 1f), 3.8f),
+
+            // Pelvis — downward, slight forward
+            (new Vector3( 0.00f, -0.03f,  0.00f), new Vector3(0.138f, 0.082f, 0.120f), palette.Pants,
+             Vector3.Normalize(new Vector3( 0.10f, -0.6f,  0.3f)), new Vector3(1f, 0f, 0.5f), 3.2f),
+
+            // Right leg (side=-1) — down-right
+            (new Vector3(-0.08f, -0.22f,  0.00f), new Vector3(0.058f, 0.280f, 0.060f), palette.Pants,
+             Vector3.Normalize(new Vector3(-1.1f, -1.3f,  0.2f)), new Vector3(0f, 0f, 1f), 5.0f),
+
+            // Left leg (side=+1) — down-left
+            (new Vector3( 0.08f, -0.22f,  0.00f), new Vector3(0.058f, 0.280f, 0.060f), Tint(palette.Pants, 0.85f),
+             Vector3.Normalize(new Vector3( 1.1f, -1.3f,  0.1f)), new Vector3(0f, 0f, -1f), 5.0f),
+
+            // Right arm — up-right
+            (new Vector3(-0.19f,  0.20f,  0.00f), new Vector3(0.048f, 0.240f, 0.052f), palette.Skin,
+             Vector3.Normalize(new Vector3(-1.4f,  0.9f,  0.3f)), new Vector3(0f, 1f, 0f), 6.0f),
+
+            // Left arm — up-left
+            (new Vector3( 0.19f,  0.20f,  0.00f), new Vector3(0.048f, 0.240f, 0.052f), Tint(palette.Skin, 0.92f),
+             Vector3.Normalize(new Vector3( 1.4f,  0.9f,  0.2f)), new Vector3(0f, -1f, 0f), 6.0f),
+
+            // Boots (one chunk slightly below legs)
+            (new Vector3(-0.08f, -0.42f,  0.03f), new Vector3(0.062f, 0.048f, 0.096f), palette.Boots,
+             Vector3.Normalize(new Vector3(-0.9f, -1.6f,  0.4f)), new Vector3(1f, 0.5f, 0f), 4.0f),
+            (new Vector3( 0.08f, -0.42f,  0.03f), new Vector3(0.062f, 0.048f, 0.096f), Tint(palette.Boots, 0.85f),
+             Vector3.Normalize(new Vector3( 0.9f, -1.6f,  0.3f)), new Vector3(-1f, 0.5f, 0f), 4.0f),
+        ];
+
+        const float travel = 2.4f; // maximum travel distance in world units at explode = 1
+
+        for (int i = 0; i < parts.Length; i++)
+        {
+            var (rest, radii, color, dir, spinAxis, spinRate) = parts[i];
+
+            // World position of this fragment.
+            var worldPos = root + rest + dir * (explode * travel);
+
+            // Spin: rotate about fragment's own axis as it flies.
+            var rot = Quaternion.CreateFromAxisAngle(Vector3.Normalize(spinAxis), explode * spinRate);
+
+            var xform = Matrix4x4.CreateFromQuaternion(rot) * Matrix4x4.CreateTranslation(worldPos);
+            DrawEllipsoid(Vector3.Zero, radii, Quaternion.Identity, xform, color);
+        }
+
+        // Shirt colour on the torso chunk already covers the chest; optionally draw the belt as a separate ring.
+        {
+            var beltDir = Vector3.Normalize(new Vector3(-0.15f, 1.0f, 0.2f));
+            var beltPos = root + new Vector3(0f, 0.02f, 0.005f) + beltDir * (explode * travel);
+            var beltRot = Quaternion.CreateFromAxisAngle(Vector3.UnitZ, explode * 3.8f);
+            var beltXform = Matrix4x4.CreateFromQuaternion(beltRot) * Matrix4x4.CreateTranslation(beltPos);
+            DrawEllipsoid(Vector3.Zero, new Vector3(0.150f, 0.036f, 0.132f), Quaternion.Identity, beltXform, palette.Belt);
+        }
     }
 
     private static void DrawLegs(

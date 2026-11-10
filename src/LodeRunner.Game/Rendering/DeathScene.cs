@@ -82,6 +82,8 @@ public sealed class DeathScene
                 break;
             case DeathCause.GuardFellOnHero:
                 particles.Blood(hero + new Vector3(0f, -0.3f, 0f), 150, 4.4f, upward: 0.35f, spreadX: 2.4f);
+                // Wider, low burst — parts scatter outward from impact point.
+                particles.Blood(hero + new Vector3(0f, 0.1f, 0f), 80, 3.8f, upward: 1.6f, spreadX: 1.8f);
                 break;
             case DeathCause.HeroFellOnGuard:
                 particles.Blood(KillerCenter(world) + new Vector3(0f, 0.1f, 0f), 160, 4.4f, upward: 1.8f, spreadX: 1.1f);
@@ -123,9 +125,10 @@ public sealed class DeathScene
                     EmitRate(-1, Center(world.Player, grid), t < 1.4f ? 70f : 0f, dt, particles, 3.0f, 1.0f, 1.3f);
                     break;
                 case DeathCause.GuardFellOnHero:
-                    fx = new CharacterRig.Fx(Crush: Smooth(t / 0.22f));
-                    EmitRate(-1, Center(world.Player, grid) + new Vector3(0f, -0.35f, 0f), t < 1.0f ? 60f : 0f,
-                        dt, particles, 2.2f, 0.3f, 2.2f);
+                    // Body parts fly outward; explode ramps from 0 to 1 over 0.35 s then holds at 1.
+                    fx = new CharacterRig.Fx(Explode: Smooth(t / 0.35f));
+                    EmitRate(-1, Center(world.Player, grid) + new Vector3(0f, -0.1f, 0f), t < 1.2f ? 55f : 0f,
+                        dt, particles, 2.8f, 0.6f, 2.0f);
                     break;
                 case DeathCause.HeroFellOnGuard:
                 {
