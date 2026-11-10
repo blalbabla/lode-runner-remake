@@ -412,6 +412,7 @@ while (!quit && !Raylib.WindowShouldClose())
         shadowMap.End();
     }
     lighting.UseShadows(useShadows ? shadowMap : null);
+    lighting.SetFog(fpsActive); // dungeon fog in FPS mode; no-op in classic view
 
     Raylib.BeginDrawing();
     Raylib.ClearBackground(background);

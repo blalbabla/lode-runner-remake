@@ -74,6 +74,10 @@ public sealed class LightingShader : IDisposable
         uniform mat4 lightVP;
         uniform int shadows;     // 1 = sample the shadow map
         uniform float shadowTexel;
+        uniform int fogEnabled;  // 1 = apply depth fog (FPS mode)
+        uniform float fogNear;   // distance at which fog starts
+        uniform float fogFar;    // distance at which fog is fully opaque
+        uniform vec3 fogColor;   // fog colour (dark dungeon tint)
         out vec4 finalColor;
 
         // 1.0 = lit, 0.0 = fully in shadow. PCF over a 5x5 kernel for soft edges.
@@ -368,13 +372,24 @@ public sealed class LightingShader : IDisposable
             }
 
             if (material != 4 && detail > 0) col += albedo * glowLight(N);
+
+            // Depth fog: blend toward fogColor with distance from the camera.
+            if (fogEnabled == 1)
+            {
+                float dist = length(viewPos - fragPos);
+                float f = clamp((dist - fogNear) / (fogFar - fogNear), 0.0, 1.0);
+                f = f * f; // quadratic: slow start, fast finish
+                col = mix(col, fogColor, f);
+            }
+
             finalColor = vec4(col, base.a);
         }
         """;
 
     private readonly Shader _shader;
     private readonly int _locLightDir, _locAmbient, _locDiffuse, _locViewPos, _locMaterial, _locDetail,
-        _locGlowCount, _locGlowPos, _locShadowMap, _locLightVP, _locShadows, _locShadowTexel;
+        _locGlowCount, _locGlowPos, _locShadowMap, _locLightVP, _locShadows, _locShadowTexel,
+        _locFogEnabled, _locFogNear, _locFogFar, _locFogColor;
     private ShadowMap? _shadowMap;
     private SurfaceMaterial _current = SurfaceMaterial.Plain;
     private readonly Vector3[] _glow = new Vector3[MaxGlowLights];
@@ -408,10 +423,32 @@ public sealed class LightingShader : IDisposable
         _locLightVP = Raylib.GetShaderLocation(_shader, "lightVP");
         _locShadows = Raylib.GetShaderLocation(_shader, "shadows");
         _locShadowTexel = Raylib.GetShaderLocation(_shader, "shadowTexel");
+        _locFogEnabled = Raylib.GetShaderLocation(_shader, "fogEnabled");
+        _locFogNear    = Raylib.GetShaderLocation(_shader, "fogNear");
+        _locFogFar     = Raylib.GetShaderLocation(_shader, "fogFar");
+        _locFogColor   = Raylib.GetShaderLocation(_shader, "fogColor");
     }
 
     /// <summary>Shadow map rendered this frame, or null to draw without shadows.</summary>
     public void UseShadows(ShadowMap? map) => _shadowMap = map is { IsValid: true } ? map : null;
+
+    /// <summary>
+    /// Enable or disable depth fog. When enabled, geometry fades to <paramref name="color"/> between
+    /// <paramref name="near"/> and <paramref name="far"/> world units from the camera.
+    /// Call before <see cref="Begin"/>.
+    /// </summary>
+    public void SetFog(bool enabled, float near = 2f, float far = 12f, Vector3 color = default)
+    {
+        if (!IsAvailable) return;
+        // Defaults to near-black with a slight blue dungeon tint.
+        if (color == default) color = new Vector3(0.03f, 0.03f, 0.06f);
+        Raylib.BeginShaderMode(_shader);
+        Raylib.SetShaderValue(_shader, _locFogEnabled, enabled ? 1 : 0, ShaderUniformDataType.Int);
+        Raylib.SetShaderValue(_shader, _locFogNear,    near,            ShaderUniformDataType.Float);
+        Raylib.SetShaderValue(_shader, _locFogFar,     far,             ShaderUniformDataType.Float);
+        Raylib.SetShaderValue(_shader, _locFogColor,   color,           ShaderUniformDataType.Vec3);
+        Raylib.EndShaderMode();
+    }
 
     // Raylib's batch may rebind texture slots on every flush, so bind the depth texture again after each one.
     private void BindShadowTexture()
