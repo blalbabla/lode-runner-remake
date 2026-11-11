@@ -17,4 +17,3 @@ smoke.png
 shot*.png
 !assets/**/*.png
 !refs/*.png
-.gitignore
