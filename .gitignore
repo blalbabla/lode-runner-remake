@@ -12,7 +12,9 @@ TestResults/
 
 # Local screenshots / dev artifacts
 s*.png
+*.zip
 smoke.png
 shot*.png
 !assets/**/*.png
 !refs/*.png
+.gitignore
